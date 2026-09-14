@@ -1,0 +1,2187 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Tuklask Tracker</title>
+
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+</head>
+
+<body>
+
+<!-- ==================================================
+     LOGIN
+================================================== -->
+
+<section
+    id="loginPage"
+    class="page active"
+>
+
+    <div class="login-page">
+
+        <div class="login-brand">
+
+            <div class="brand-mark">
+                T
+            </div>
+
+            <div>
+                <h1>TUKLASK</h1>
+
+                <p>
+                    Game Progress Tracker
+                </p>
+            </div>
+
+        </div>
+
+
+        <div class="login-card">
+
+            <div class="login-heading">
+
+                <span class="eyebrow">
+                    TRACKER PORTAL
+                </span>
+
+                <h2>
+                    Login
+                </h2>
+
+                <p>
+                    Monitor Tuklask game progress,
+                    statistics and rankings.
+                </p>
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="loginEmail">
+                    Email Address
+                </label>
+
+                <input
+                    id="loginEmail"
+                    type="email"
+                    placeholder="Enter your email"
+                    autocomplete="email"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="loginPassword">
+                    Password
+                </label>
+
+                <input
+                    id="loginPassword"
+                    type="password"
+                    placeholder="Enter your password"
+                    autocomplete="current-password"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="loginRole">
+                    Role
+                </label>
+
+                <select id="loginRole">
+
+                    <option value="">
+                        Select role
+                    </option>
+
+                    <option value="admin">
+                        Teacher / Admin
+                    </option>
+
+                    <option value="student">
+                        Student
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <p
+                id="loginSuccess"
+                class="success-message"
+                role="status"
+                aria-live="polite"
+            ></p>
+
+
+            <p
+                id="loginError"
+                class="error-message"
+            ></p>
+
+
+            <button
+                id="loginButton"
+                class="button button-primary button-full"
+            >
+                Sign In
+            </button>
+
+
+            <div class="auth-divider">
+                <span>New teacher?</span>
+            </div>
+
+
+            <button
+                id="openRegistrationButton"
+                class="button button-secondary button-full"
+                type="button"
+            >
+                Create Teacher / Admin Account
+            </button>
+
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ==================================================
+     TEACHER / ADMIN REGISTRATION
+================================================== -->
+
+<section
+    id="registerPage"
+    class="page"
+>
+
+    <div class="login-page">
+
+        <div class="login-brand">
+
+            <div class="brand-mark">
+                T
+            </div>
+
+            <div>
+                <h1>TUKLASK</h1>
+
+                <p>
+                    Teacher Registration
+                </p>
+            </div>
+
+        </div>
+
+
+        <div class="login-card">
+
+            <div class="login-heading">
+
+                <span class="eyebrow">
+                    TEACHER / ADMIN
+                </span>
+
+                <h2>
+                    Create Account
+                </h2>
+
+                <p>
+                    Register with an email address and password,
+                    then sign in to open the Admin dashboard.
+                </p>
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="registerName">
+                    Full Name
+                </label>
+
+                <input
+                    id="registerName"
+                    type="text"
+                    maxlength="100"
+                    placeholder="Enter your full name"
+                    autocomplete="name"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="registerEmail">
+                    Email Address
+                </label>
+
+                <input
+                    id="registerEmail"
+                    type="email"
+                    placeholder="Enter your email"
+                    autocomplete="email"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="registerPassword">
+                    Password
+                </label>
+
+                <input
+                    id="registerPassword"
+                    type="password"
+                    minlength="6"
+                    placeholder="Use at least 6 characters"
+                    autocomplete="new-password"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="registerConfirmPassword">
+                    Confirm Password
+                </label>
+
+                <input
+                    id="registerConfirmPassword"
+                    type="password"
+                    minlength="6"
+                    placeholder="Enter the password again"
+                    autocomplete="new-password"
+                >
+
+            </div>
+
+
+            <p
+                id="registerError"
+                class="error-message"
+            ></p>
+
+
+            <button
+                id="registerButton"
+                class="button button-primary button-full"
+                type="button"
+            >
+                Create Account
+            </button>
+
+
+            <button
+                id="backToLoginButton"
+                class="auth-back-button"
+                type="button"
+            >
+                Back to Login
+            </button>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ==================================================
+     ADMIN
+================================================== -->
+
+<section
+    id="adminPage"
+    class="page dashboard-page"
+>
+
+    <!-- MOBILE HEADER -->
+
+    <header class="mobile-header">
+
+        <button
+            class="menu-button"
+            data-menu-target="adminSidebar"
+            aria-label="Open menu"
+        >
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+
+        <div class="mobile-brand">
+
+            <div class="mobile-brand-mark">
+                T
+            </div>
+
+            <div>
+                <strong>
+                    TUKLASK
+                </strong>
+
+                <small>
+                    Admin
+                </small>
+            </div>
+
+        </div>
+
+    </header>
+
+
+    <!-- SIDEBAR -->
+
+    <aside
+        id="adminSidebar"
+        class="sidebar"
+    >
+
+        <div class="sidebar-brand">
+
+            <div class="brand-mark sidebar-mark">
+                T
+            </div>
+
+            <div>
+
+                <strong>
+                    TUKLASK
+                </strong>
+
+                <span>
+                    Admin Tracker
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <nav class="navigation">
+
+            <button
+                class="nav-button admin-nav active"
+                data-admin-page="adminDashboard"
+            >
+                Dashboard
+            </button>
+
+
+            <button
+                class="nav-button admin-nav"
+                data-admin-page="studentManagement"
+            >
+                Student Management
+            </button>
+
+
+            <button
+                class="nav-button admin-nav"
+                data-admin-page="adminLeaderboard"
+            >
+                Leaderboard
+            </button>
+
+
+            <button
+                class="nav-button admin-nav"
+                data-admin-page="questionManagement"
+            >
+                Question Management
+            </button>
+
+        </nav>
+
+
+        <div class="sidebar-footer">
+
+            <button
+                id="adminContinueButton"
+                class="nav-button"
+            >
+                Exit
+            </button>
+
+        </div>
+
+    </aside>
+
+
+    <div
+        class="sidebar-overlay"
+        data-overlay="adminSidebar"
+    ></div>
+
+
+    <!-- ADMIN CONTENT -->
+
+    <main class="dashboard-content">
+
+        <!-- ==============================
+             ADMIN DASHBOARD
+        ============================== -->
+
+        <section
+            id="adminDashboard"
+            class="content-section active"
+        >
+
+            <div class="page-heading">
+
+                <div>
+
+                    <span class="eyebrow">
+                        ADMIN
+                    </span>
+
+                    <h1>
+                        Dashboard Overview
+                    </h1>
+
+                    <p>
+                        Monitor students assigned to your
+                        Tuklask room keys.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="stats-grid">
+
+                <article class="stat-card">
+
+                    <span class="stat-label">
+                        Total Students
+                    </span>
+
+                    <strong
+                        id="totalStudents"
+                        class="stat-value"
+                    >
+                        0
+                    </strong>
+
+                    <span class="stat-line blue-line"></span>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <span class="stat-label">
+                        Active Students
+                    </span>
+
+                    <strong
+                        id="activeStudents"
+                        class="stat-value"
+                    >
+                        0
+                    </strong>
+
+                    <span class="stat-line yellow-line"></span>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <span class="stat-label">
+                        Total Stages Completed
+                    </span>
+
+                    <strong
+                        id="totalStagesCompleted"
+                        class="stat-value"
+                    >
+                        0
+                    </strong>
+
+                    <span class="stat-line red-line"></span>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <span class="stat-label">
+                        Average Level
+                    </span>
+
+                    <strong
+                        id="averageLevel"
+                        class="stat-value"
+                    >
+                        0
+                    </strong>
+
+                    <span class="stat-line blue-line"></span>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <span class="stat-label">
+                        Average EXP
+                    </span>
+
+                    <strong
+                        id="averageExp"
+                        class="stat-value"
+                    >
+                        0
+                    </strong>
+
+                    <span class="stat-line yellow-line"></span>
+
+                </article>
+
+            </div>
+
+
+            <section class="panel">
+
+                <div class="panel-heading">
+
+                    <div>
+
+                        <span class="eyebrow">
+                            PERFORMANCE
+                        </span>
+
+                        <h2>
+                            Top Players
+                        </h2>
+
+                        <p>
+                            Highest ranked students from your rooms based on EXP.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="topPlayers"
+                    class="top-player-list"
+                ></div>
+
+            </section>
+
+        </section>
+
+
+        <!-- ==============================
+             STUDENT MANAGEMENT
+        ============================== -->
+
+        <section
+            id="studentManagement"
+            class="content-section"
+        >
+
+            <div class="page-heading">
+
+                <div>
+
+                    <span class="eyebrow">
+                        ADMIN
+                    </span>
+
+                    <h1>
+                        Student Management
+                    </h1>
+
+                    <p>
+                        Search, filter and inspect students assigned to your rooms.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <section class="panel">
+
+                <div class="filter-grid">
+
+                    <div class="filter-field filter-search">
+
+                        <label for="managementSearch">
+                            Search
+                        </label>
+
+                        <input
+                            id="managementSearch"
+                            type="text"
+                            placeholder="Nickname or student number"
+                        >
+
+                    </div>
+
+
+                    <div class="filter-field">
+
+                        <label for="managementLevel">
+                            Level
+                        </label>
+
+                        <select id="managementLevel">
+
+                            <option value="all">
+                                All Levels
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <div class="filter-field">
+
+                        <label for="managementSection">
+                            Section
+                        </label>
+
+                        <select id="managementSection">
+
+                            <option value="all">
+                                All Sections
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <button
+                        id="managementReset"
+                        class="button button-secondary filter-button"
+                    >
+                        Reset
+                    </button>
+
+                </div>
+
+
+                <div class="table-wrapper">
+
+                    <table>
+
+                        <thead>
+
+                            <tr>
+                                <th>Player</th>
+                                <th>Student Number</th>
+                                <th>Room Key</th>
+                                <th>Section</th>
+                                <th>Stage</th>
+                                <th>Level</th>
+                                <th>EXP</th>
+                                <th>Action</th>
+                            </tr>
+
+                        </thead>
+
+
+                        <tbody id="managementTable"></tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+
+            <section
+                id="studentDetailsPanel"
+                class="panel hidden"
+            >
+
+                <div class="panel-heading panel-heading-row">
+
+                    <div>
+
+                        <span class="eyebrow">
+                            STUDENT DETAILS
+                        </span>
+
+                        <h2>
+                            Player Information
+                        </h2>
+
+                    </div>
+
+
+                    <button
+                        id="closeStudentDetails"
+                        class="close-button"
+                        aria-label="Close"
+                    >
+                        ×
+                    </button>
+
+                </div>
+
+
+                <div class="detail-grid">
+
+                    <div class="detail-card">
+                        <span>Nickname</span>
+                        <strong id="detailNickname">-</strong>
+                    </div>
+
+                    <div class="detail-card">
+                        <span>Email</span>
+                        <strong id="detailEmail">-</strong>
+                    </div>
+
+                    <div class="detail-card">
+                        <span>Student Number</span>
+                        <strong id="detailStudentNumber">-</strong>
+                    </div>
+
+                    <div class="detail-card">
+                        <span>Year / Section</span>
+                        <strong id="detailSection">-</strong>
+                    </div>
+
+                    <div class="detail-card">
+                        <span>Room Key</span>
+                        <strong id="detailRoomKey">-</strong>
+                    </div>
+
+                    <div class="detail-card">
+                        <span>Current Stage</span>
+                        <strong id="detailStage">-</strong>
+                    </div>
+
+                    <div class="detail-card">
+                        <span>Level</span>
+                        <strong id="detailLevel">-</strong>
+                    </div>
+
+                    <div class="detail-card">
+                        <span>Total EXP</span>
+                        <strong id="detailExp">-</strong>
+                    </div>
+
+                    <div class="detail-card">
+                        <span>Correct Answers</span>
+                        <strong id="detailCorrect">-</strong>
+                    </div>
+
+                    <div class="detail-card">
+                        <span>Wrong Answers</span>
+                        <strong id="detailWrong">-</strong>
+                    </div>
+
+                    <div class="detail-card">
+                        <span>Overall Result</span>
+                        <strong id="detailResult">-</strong>
+                    </div>
+
+                </div>
+
+            </section>
+
+        </section>
+
+
+        <!-- ==============================
+             ADMIN LEADERBOARD
+        ============================== -->
+
+        <section
+            id="adminLeaderboard"
+            class="content-section"
+        >
+
+            <div class="page-heading">
+
+                <div>
+
+                    <span class="eyebrow">
+                        ADMIN
+                    </span>
+
+                    <h1>
+                        Leaderboard
+                    </h1>
+
+                    <p>
+                        Rankings include only students assigned to your room keys.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <section class="panel">
+
+                <div class="filter-grid leaderboard-filter-grid">
+
+                    <div class="filter-field filter-search">
+
+                        <label for="adminLeaderboardSearch">
+                            Search
+                        </label>
+
+                        <input
+                            id="adminLeaderboardSearch"
+                            type="text"
+                            placeholder="Nickname or student number"
+                        >
+
+                    </div>
+
+
+                    <div class="filter-field">
+
+                        <label for="adminLeaderboardRoom">
+                            Room Key
+                        </label>
+
+                        <select id="adminLeaderboardRoom">
+                            <option value="all">All My Rooms</option>
+                        </select>
+
+                    </div>
+
+
+                    <div class="filter-field">
+
+                        <label for="adminLeaderboardLevel">
+                            Level
+                        </label>
+
+                        <select id="adminLeaderboardLevel">
+                            <option value="all">All Levels</option>
+                        </select>
+
+                    </div>
+
+
+                    <div class="filter-field">
+
+                        <label for="adminLeaderboardSection">
+                            Section
+                        </label>
+
+                        <select id="adminLeaderboardSection">
+                            <option value="all">All Sections</option>
+                        </select>
+
+                    </div>
+
+
+                    <div class="filter-field">
+
+                        <label for="adminLeaderboardSort">
+                            Sort
+                        </label>
+
+                        <select id="adminLeaderboardSort">
+
+                            <option value="ranking">
+                                Ranking
+                            </option>
+
+                            <option value="expHigh">
+                                Highest EXP
+                            </option>
+
+                            <option value="expLow">
+                                Lowest EXP
+                            </option>
+
+                            <option value="levelHigh">
+                                Highest Level
+                            </option>
+
+                            <option value="levelLow">
+                                Lowest Level
+                            </option>
+
+                            <option value="nameAZ">
+                                Name A-Z
+                            </option>
+
+                            <option value="nameZA">
+                                Name Z-A
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <div class="filter-field">
+
+                        <label for="adminLeaderboardTop">
+                            Players
+                        </label>
+
+                        <select id="adminLeaderboardTop">
+
+                            <option value="all">
+                                All Players
+                            </option>
+
+                            <option value="5">
+                                Top 5
+                            </option>
+
+                            <option value="10">
+                                Top 10
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <button
+                        id="adminLeaderboardReset"
+                        class="button button-secondary filter-button"
+                    >
+                        Reset
+                    </button>
+
+                </div>
+
+
+                <div class="table-wrapper">
+
+                    <table>
+
+                        <thead>
+
+                            <tr>
+                                <th>Rank</th>
+                                <th>Player</th>
+                                <th>Student Number</th>
+                                <th>Room Key</th>
+                                <th>Section</th>
+                                <th>Level</th>
+                                <th>EXP</th>
+                                <th>Stage</th>
+                                <th>Correct</th>
+                                <th>Wrong</th>
+                            </tr>
+
+                        </thead>
+
+                        <tbody id="adminLeaderboardTable"></tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+        </section>
+
+
+        <!-- ==============================
+             QUESTION MANAGEMENT
+        ============================== -->
+
+        <section
+            id="questionManagement"
+            class="content-section"
+        >
+
+            <div class="page-heading">
+
+                <div>
+
+                    <span class="eyebrow">
+                        ADMIN
+                    </span>
+
+                    <h1>
+                        Question Management
+                    </h1>
+
+                    <p>
+                        Create and manage the quiz questions stored in Tuklask.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <section class="panel room-key-panel">
+
+                <div class="panel-heading">
+
+                    <div>
+
+                        <span class="eyebrow">
+                            ACTIVE ROOM
+                        </span>
+
+                        <h2>
+                            Set Room Key
+                        </h2>
+
+                        <p>
+                            Enter the room key once. Every question you add will use this key until you switch rooms.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="room-key-setup">
+
+                    <div class="filter-field">
+
+                        <label for="questionRoomKey">
+                            Room Key
+                        </label>
+
+                        <input
+                            id="questionRoomKey"
+                            type="text"
+                            minlength="4"
+                            maxlength="24"
+                            pattern="[A-Za-z0-9_-]+"
+                            autocomplete="off"
+                            placeholder="Example: ICT8-A25"
+                            aria-describedby="questionRoomKeyHint roomKeyMessage"
+                        >
+
+                        <small
+                            id="questionRoomKeyHint"
+                            class="field-hint"
+                        >
+                            Use 4–24 letters, numbers, hyphens or underscores.
+                        </small>
+
+                    </div>
+
+
+                    <button
+                        id="activateRoomKeyButton"
+                        class="button button-primary"
+                        type="button"
+                    >
+                        Set Room Key
+                    </button>
+
+                </div>
+
+
+                <div class="room-key-status-row">
+
+                    <p
+                        id="roomKeyMessage"
+                        class="room-key-message"
+                        role="status"
+                        aria-live="polite"
+                    >
+                        Set a room key to unlock the question form.
+                    </p>
+
+                    <div
+                        id="activeRoomKeyStatus"
+                        class="active-room-key hidden"
+                    >
+                        <span>Active room</span>
+                        <strong id="activeRoomKeyDisplay"></strong>
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <section class="panel">
+
+                <div class="panel-heading">
+
+                    <div>
+
+                        <span class="eyebrow">
+                            QUIZ QUESTION
+                        </span>
+
+                        <h2 id="questionFormHeading">
+                            Add Question
+                        </h2>
+
+                        <p id="questionFormDescription">
+                            Set a room key above to unlock this form.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <form id="questionForm" novalidate>
+
+                    <fieldset
+                        id="questionFormFields"
+                        class="question-form-fields"
+                        disabled
+                    >
+
+                    <div class="question-form-grid">
+
+                        <div class="filter-field question-full">
+
+                            <label for="questionText">
+                                Question
+                            </label>
+
+                            <textarea
+                                id="questionText"
+                                rows="4"
+                                maxlength="500"
+                                placeholder="Enter the question"
+                                required
+                            ></textarea>
+
+                        </div>
+
+
+                        <div class="filter-field">
+
+                            <label for="questionOptionA">
+                                Option A
+                            </label>
+
+                            <input
+                                id="questionOptionA"
+                                type="text"
+                                maxlength="200"
+                                placeholder="Enter option A"
+                                required
+                            >
+
+                        </div>
+
+
+                        <div class="filter-field">
+
+                            <label for="questionOptionB">
+                                Option B
+                            </label>
+
+                            <input
+                                id="questionOptionB"
+                                type="text"
+                                maxlength="200"
+                                placeholder="Enter option B"
+                                required
+                            >
+
+                        </div>
+
+
+                        <div class="filter-field">
+
+                            <label for="questionOptionC">
+                                Option C
+                            </label>
+
+                            <input
+                                id="questionOptionC"
+                                type="text"
+                                maxlength="200"
+                                placeholder="Enter option C"
+                                required
+                            >
+
+                        </div>
+
+
+                        <div class="filter-field">
+
+                            <label for="questionOptionD">
+                                Option D
+                            </label>
+
+                            <input
+                                id="questionOptionD"
+                                type="text"
+                                maxlength="200"
+                                placeholder="Enter option D"
+                                required
+                            >
+
+                        </div>
+
+
+                        <div class="filter-field">
+
+                            <label for="questionCorrectAnswer">
+                                Correct Answer
+                            </label>
+
+                            <select id="questionCorrectAnswer" required>
+                                <option value="">Select correct answer</option>
+                                <option value="A">Option A</option>
+                                <option value="B">Option B</option>
+                                <option value="C">Option C</option>
+                                <option value="D">Option D</option>
+                            </select>
+
+                        </div>
+
+
+                    </div>
+
+
+                    <div class="filter-field">
+
+                        <label for="roomTeacherName">
+                            Teacher Name
+                        </label>
+
+                        <input
+                            id="roomTeacherName"
+                            type="text"
+                            maxlength="100"
+                            autocomplete="name"
+                            placeholder="Example: Maria Santos"
+                        >
+
+                    </div>
+
+
+                    <div class="filter-field">
+
+                        <label for="roomGradeLevel">
+                            Grade Level
+                        </label>
+
+                        <input
+                            id="roomGradeLevel"
+                            type="text"
+                            maxlength="40"
+                            autocomplete="off"
+                            placeholder="Example: Grade 8"
+                        >
+
+                    </div>
+
+
+                    <div class="filter-field">
+
+                        <label for="roomSection">
+                            Section
+                        </label>
+
+                        <input
+                            id="roomSection"
+                            type="text"
+                            maxlength="60"
+                            autocomplete="off"
+                            placeholder="Example: A25"
+                        >
+
+                    </div>
+
+
+                    <p
+                        id="questionFormMessage"
+                        class="question-form-message"
+                        role="status"
+                        aria-live="polite"
+                    ></p>
+
+
+                    <div class="question-form-actions">
+
+                        <button
+                            id="saveQuestionButton"
+                            class="button button-primary"
+                            type="submit"
+                        >
+                            Add Question
+                        </button>
+
+                        <button
+                            id="cancelQuestionEditButton"
+                            class="button button-secondary hidden"
+                            type="button"
+                        >
+                            Cancel Edit
+                        </button>
+
+                    </div>
+
+                    </fieldset>
+
+                </form>
+
+            </section>
+
+
+            <section class="panel">
+
+                <div class="panel-heading panel-heading-row">
+
+                    <div>
+
+                        <span class="eyebrow">
+                            QUESTION BANK
+                        </span>
+
+                        <h2>
+                            Saved Questions
+                        </h2>
+
+                        <p>
+                            Questions currently stored in Firebase.
+                        </p>
+
+                    </div>
+
+                    <span
+                        id="questionCount"
+                        class="question-count"
+                    >
+                        0 questions
+                    </span>
+
+                </div>
+
+
+                <div class="filter-grid question-filter-grid">
+
+                    <div class="filter-field filter-search">
+
+                        <label for="questionSearch">
+                            Search
+                        </label>
+
+                        <input
+                            id="questionSearch"
+                            type="search"
+                            placeholder="Search question text or options"
+                        >
+
+                    </div>
+
+
+                    <div class="filter-field">
+
+                        <label for="questionRoomKeyFilter">
+                            Room Key
+                        </label>
+
+                        <select id="questionRoomKeyFilter">
+                            <option value="all">All Room Keys</option>
+                        </select>
+
+                    </div>
+
+
+                    <button
+                        id="questionFilterReset"
+                        class="button button-secondary filter-button"
+                        type="button"
+                    >
+                        Reset
+                    </button>
+
+                </div>
+
+
+                <div class="table-wrapper">
+
+                    <table class="question-table">
+
+                        <thead>
+
+                            <tr>
+                                <th>Question</th>
+                                <th>Room Key</th>
+                                <th>Correct</th>
+                                <th>Actions</th>
+                            </tr>
+
+                        </thead>
+
+
+                        <tbody id="questionTable">
+                            <tr>
+                                <td colspan="4" class="question-empty-state">
+                                    Questions will appear here after an admin signs in.
+                                </td>
+                            </tr>
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+        </section>
+
+    </main>
+
+</section>
+
+
+<!-- ==================================================
+     STUDENT
+================================================== -->
+
+<section
+    id="studentPage"
+    class="page dashboard-page"
+>
+
+    <header class="mobile-header">
+
+        <button
+            class="menu-button"
+            data-menu-target="studentSidebar"
+            aria-label="Open menu"
+        >
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+
+
+        <div class="mobile-brand">
+
+            <div class="mobile-brand-mark">
+                T
+            </div>
+
+            <div>
+
+                <strong>
+                    TUKLASK
+                </strong>
+
+                <small>
+                    Student
+                </small>
+
+            </div>
+
+        </div>
+
+    </header>
+
+
+    <aside
+        id="studentSidebar"
+        class="sidebar"
+    >
+
+        <div class="sidebar-brand">
+
+            <div class="brand-mark sidebar-mark">
+                T
+            </div>
+
+            <div>
+
+                <strong>
+                    TUKLASK
+                </strong>
+
+                <span>
+                    Student Tracker
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <nav class="navigation">
+
+            <button
+                class="nav-button student-nav active"
+                data-student-page="studentDashboard"
+            >
+                Dashboard
+            </button>
+
+
+            <button
+                class="nav-button student-nav"
+                data-student-page="studentProgress"
+            >
+                Progress
+            </button>
+
+
+            <button
+                class="nav-button student-nav"
+                data-student-page="studentQuiz"
+            >
+                Quiz Results
+            </button>
+
+
+            <button
+                class="nav-button student-nav"
+                data-student-page="studentLeaderboard"
+            >
+                Leaderboard
+            </button>
+
+        </nav>
+
+
+        <div class="sidebar-footer">
+
+            <button
+                id="studentContinueButton"
+                class="nav-button"
+            >
+                Continue / Exit
+            </button>
+
+        </div>
+
+    </aside>
+
+
+    <div
+        class="sidebar-overlay"
+        data-overlay="studentSidebar"
+    ></div>
+
+
+    <main class="dashboard-content">
+
+        <section
+            id="studentDashboard"
+            class="content-section active"
+        >
+
+            <div class="page-heading">
+
+                <div>
+
+                    <span class="eyebrow">
+                        STUDENT
+                    </span>
+
+                    <h1>
+                        Dashboard
+                    </h1>
+
+                    <p>
+                        Your Tuklask player information.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <section class="profile-card">
+
+                <div class="profile-initial">
+                    T
+                </div>
+
+
+                <div class="profile-info">
+
+                    <span>
+                        Player Name
+                    </span>
+
+                    <h2 id="studentName">
+                        -
+                    </h2>
+
+                    <p id="studentEmail">
+                        -
+                    </p>
+
+                </div>
+
+            </section>
+
+
+            <div class="stats-grid">
+
+                <article class="stat-card">
+
+                    <span class="stat-label">
+                        Level
+                    </span>
+
+                    <strong
+                        id="studentLevel"
+                        class="stat-value"
+                    >
+                        0
+                    </strong>
+
+                    <span class="stat-line blue-line"></span>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <span class="stat-label">
+                        Total EXP
+                    </span>
+
+                    <strong
+                        id="studentExp"
+                        class="stat-value"
+                    >
+                        0
+                    </strong>
+
+                    <span class="stat-line yellow-line"></span>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <span class="stat-label">
+                        Current Stage
+                    </span>
+
+                    <strong
+                        id="studentStage"
+                        class="stat-value"
+                    >
+                        0
+                    </strong>
+
+                    <span class="stat-line red-line"></span>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <span class="stat-label">
+                        Student Number
+                    </span>
+
+                    <strong
+                        id="studentNumber"
+                        class="stat-value stat-value-small"
+                    >
+                        -
+                    </strong>
+
+                    <span class="stat-line blue-line"></span>
+
+                </article>
+
+
+                <article class="stat-card">
+
+                    <span class="stat-label">
+                        Year / Section
+                    </span>
+
+                    <strong
+                        id="studentSection"
+                        class="stat-value stat-value-small"
+                    >
+                        -
+                    </strong>
+
+                    <span class="stat-line yellow-line"></span>
+
+                </article>
+
+            </div>
+
+        </section>
+
+
+        <section
+            id="studentProgress"
+            class="content-section"
+        >
+
+            <div class="page-heading">
+
+                <div>
+
+                    <span class="eyebrow">
+                        STUDENT
+                    </span>
+
+                    <h1>
+                        Progress
+                    </h1>
+
+                    <p>
+                        Track your Tuklask game progression.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="large-card-grid">
+
+                <article class="large-card">
+
+                    <span>
+                        Current Stage
+                    </span>
+
+                    <strong id="progressStage">
+                        0
+                    </strong>
+
+                    <div class="large-card-line blue-background"></div>
+
+                </article>
+
+
+                <article class="large-card">
+
+                    <span>
+                        Level
+                    </span>
+
+                    <strong id="progressLevel">
+                        0
+                    </strong>
+
+                    <div class="large-card-line red-background"></div>
+
+                </article>
+
+
+                <article class="large-card">
+
+                    <span>
+                        Total EXP
+                    </span>
+
+                    <strong id="progressExp">
+                        0
+                    </strong>
+
+                    <div class="large-card-line yellow-background"></div>
+
+                </article>
+
+
+                <article class="large-card">
+
+                    <span>
+                        Stages Completed
+                    </span>
+
+                    <strong id="progressCompleted">
+                        0
+                    </strong>
+
+                    <div class="large-card-line blue-background"></div>
+
+                </article>
+
+            </div>
+
+        </section>
+
+
+        <section
+            id="studentQuiz"
+            class="content-section"
+        >
+
+            <div class="page-heading">
+
+                <div>
+
+                    <span class="eyebrow">
+                        STUDENT
+                    </span>
+
+                    <h1>
+                        Quiz Results
+                    </h1>
+
+                    <p>
+                        Review your Tuklask quiz performance.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="large-card-grid">
+
+                <article class="large-card">
+
+                    <span>
+                        Correct Answers
+                    </span>
+
+                    <strong id="quizCorrect">
+                        0
+                    </strong>
+
+                    <div class="large-card-line blue-background"></div>
+
+                </article>
+
+
+                <article class="large-card">
+
+                    <span>
+                        Wrong Answers
+                    </span>
+
+                    <strong id="quizWrong">
+                        0
+                    </strong>
+
+                    <div class="large-card-line red-background"></div>
+
+                </article>
+
+
+                <article class="large-card">
+
+                    <span>
+                        Overall Result
+                    </span>
+
+                    <strong id="quizResult">
+                        0%
+                    </strong>
+
+                    <div class="large-card-line yellow-background"></div>
+
+                </article>
+
+            </div>
+
+        </section>
+
+
+        <section
+            id="studentLeaderboard"
+            class="content-section"
+        >
+
+            <div class="page-heading">
+
+                <div>
+
+                    <span class="eyebrow">
+                        STUDENT
+                    </span>
+
+                    <h1>
+                        Leaderboard
+                    </h1>
+
+                    <p>
+                        Compare your Tuklask ranking
+                        with other players.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <section class="panel">
+
+                <div class="filter-grid leaderboard-filter-grid">
+
+                    <div class="filter-field filter-search">
+
+                        <label for="studentLeaderboardSearch">
+                            Search
+                        </label>
+
+                        <input
+                            id="studentLeaderboardSearch"
+                            type="text"
+                            placeholder="Nickname or student number"
+                        >
+
+                    </div>
+
+
+                    <div class="filter-field">
+
+                        <label for="studentLeaderboardLevel">
+                            Level
+                        </label>
+
+                        <select id="studentLeaderboardLevel">
+                            <option value="all">All Levels</option>
+                        </select>
+
+                    </div>
+
+
+                    <div class="filter-field">
+
+                        <label for="studentLeaderboardSection">
+                            Section
+                        </label>
+
+                        <select id="studentLeaderboardSection">
+                            <option value="all">All Sections</option>
+                        </select>
+
+                    </div>
+
+
+                    <div class="filter-field">
+
+                        <label for="studentLeaderboardSort">
+                            Sort
+                        </label>
+
+                        <select id="studentLeaderboardSort">
+
+                            <option value="ranking">
+                                Ranking
+                            </option>
+
+                            <option value="expHigh">
+                                Highest EXP
+                            </option>
+
+                            <option value="expLow">
+                                Lowest EXP
+                            </option>
+
+                            <option value="levelHigh">
+                                Highest Level
+                            </option>
+
+                            <option value="levelLow">
+                                Lowest Level
+                            </option>
+
+                            <option value="nameAZ">
+                                Name A-Z
+                            </option>
+
+                            <option value="nameZA">
+                                Name Z-A
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <div class="filter-field">
+
+                        <label for="studentLeaderboardTop">
+                            Players
+                        </label>
+
+                        <select id="studentLeaderboardTop">
+
+                            <option value="all">
+                                All Players
+                            </option>
+
+                            <option value="5">
+                                Top 5
+                            </option>
+
+                            <option value="10">
+                                Top 10
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <button
+                        id="studentLeaderboardReset"
+                        class="button button-secondary filter-button"
+                    >
+                        Reset
+                    </button>
+
+                </div>
+
+
+                <div class="table-wrapper">
+
+                    <table>
+
+                        <thead>
+
+                            <tr>
+                                <th>Rank</th>
+                                <th>Player</th>
+                                <th>Section</th>
+                                <th>Level</th>
+                                <th>EXP</th>
+                                <th>Stage</th>
+                            </tr>
+
+                        </thead>
+
+
+                        <tbody id="studentLeaderboardTable"></tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+        </section>
+
+    </main>
+
+</section>
+
+
+<!-- ==================================================
+     CONTINUE
+================================================== -->
+
+<div
+    id="continueModal"
+    class="modal hidden"
+>
+
+    <div class="modal-card">
+
+        <span class="eyebrow">
+            SESSION
+        </span>
+
+        <h2>
+            Continue Using Website?
+        </h2>
+
+        <p>
+            Select Yes to return to login.
+            Select No to end the current session.
+        </p>
+
+
+        <div class="modal-actions">
+
+            <button
+                id="continueYes"
+                class="button button-primary"
+            >
+                Yes
+            </button>
+
+
+            <button
+                id="continueNo"
+                class="button button-danger"
+            >
+                No
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<!-- ==================================================
+     END PAGE
+================================================== -->
+
+<section
+    id="endPage"
+    class="page"
+>
+
+    <div class="end-page">
+
+        <div class="brand-mark">
+            T
+        </div>
+
+        <span class="eyebrow">
+            TUKLASK TRACKER
+        </span>
+
+        <h1>
+            Session Ended
+        </h1>
+
+        <p>
+            Your tracker session has ended.
+        </p>
+
+
+        <button
+            id="restartButton"
+            class="button button-primary"
+        >
+            Open Website Again
+        </button>
+
+    </div>
+
+</section>
+
+
+<!-- Firebase requires app.js to be loaded as a module -->
+<script type="module" src="app.js"></script>
+
+</body>
+</html>
