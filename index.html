@@ -398,7 +398,7 @@
                 class="nav-button admin-nav"
                 data-admin-page="studentManagement"
             >
-                Student Management
+                Student Overview
             </button>
 
 
@@ -407,6 +407,14 @@
                 data-admin-page="adminLeaderboard"
             >
                 Leaderboard
+            </button>
+
+
+            <button
+                class="nav-button admin-nav"
+                data-admin-page="roomManagement"
+            >
+                Room Management
             </button>
 
 
@@ -620,7 +628,7 @@
                     </span>
 
                     <h1>
-                        Student Management
+                        Learning Student Overview
                     </h1>
 
                     <p>
@@ -1016,11 +1024,11 @@
 
 
         <!-- ==============================
-             QUESTION MANAGEMENT
+             ROOM MANAGEMENT
         ============================== -->
 
         <section
-            id="questionManagement"
+            id="roomManagement"
             class="content-section"
         >
 
@@ -1029,15 +1037,15 @@
                 <div>
 
                     <span class="eyebrow">
-                        ADMIN
+                        LEARNING TOOL
                     </span>
 
                     <h1>
-                        Question Management
+                        Room Management
                     </h1>
 
                     <p>
-                        Create and manage the quiz questions stored in Tuklask.
+                        Create a room once, then use its key for questions and Unity players.
                     </p>
 
                 </div>
@@ -1052,15 +1060,15 @@
                     <div>
 
                         <span class="eyebrow">
-                            ACTIVE ROOM
+                            ROOM DETAILS
                         </span>
 
                         <h2>
-                            Set Room Key
+                            Create or Open a Room
                         </h2>
 
                         <p>
-                            Enter the room key once. Every question you add will use this key until you switch rooms.
+                            Enter the room key and details together. Existing rooms can be reopened by entering their key.
                         </p>
 
                     </div>
@@ -1153,7 +1161,7 @@
                         class="button button-primary"
                         type="button"
                     >
-                        Set Room Key
+                        Create / Open Room
                     </button>
 
                 </div>
@@ -1167,7 +1175,7 @@
                         role="status"
                         aria-live="polite"
                     >
-                        Set a room key to unlock the question form.
+                        Create or open a room before adding questions.
                     </p>
 
                     <div
@@ -1179,6 +1187,130 @@
                     </div>
 
                 </div>
+
+            </section>
+
+
+            <section class="panel">
+
+                <div class="panel-heading panel-heading-row">
+
+                    <div>
+                        <span class="eyebrow">MY ROOMS</span>
+                        <h2>Room List</h2>
+                        <p>Use, activate, deactivate, or delete rooms you created.</p>
+                    </div>
+
+                    <span id="roomCount" class="question-count">0 rooms</span>
+
+                </div>
+
+                <div class="table-wrapper">
+
+                    <table class="question-table">
+                        <thead>
+                            <tr>
+                                <th>Room Key</th>
+                                <th>Grade / Section</th>
+                                <th>Status</th>
+                                <th>Students</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="roomTable">
+                            <tr>
+                                <td colspan="5" class="question-empty-state">
+                                    Your rooms will appear here.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                </div>
+
+            </section>
+
+        </section>
+
+
+        <!-- ==============================
+             QUESTION MANAGEMENT
+        ============================== -->
+
+        <section
+            id="questionManagement"
+            class="content-section"
+        >
+
+            <div class="page-heading">
+
+                <div>
+
+                    <span class="eyebrow">
+                        ADMIN
+                    </span>
+
+                    <h1>
+                        Question Management
+                    </h1>
+
+                    <p>
+                        Create and manage the quiz questions stored in Tuklask.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <section class="panel room-key-panel">
+
+                <div class="panel-heading">
+
+                    <div>
+
+                        <span class="eyebrow">
+                            ACTIVE ROOM
+                        </span>
+
+                        <h2>
+                            Choose a Room
+                        </h2>
+
+                        <p>
+                            Questions are saved under the selected room and appear in Unity for that room key.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="room-key-setup question-room-picker">
+
+                    <div class="filter-field">
+
+                        <label for="questionActiveRoomSelect">
+                            My Room
+                        </label>
+
+                        <select id="questionActiveRoomSelect">
+                            <option value="">Create a room first</option>
+                        </select>
+
+                    </div>
+
+
+                    <button
+                        id="openRoomManagementButton"
+                        class="button button-primary"
+                        type="button"
+                    >
+                        Manage Rooms
+                    </button>
+
+                </div>
+
 
             </section>
 
@@ -1198,7 +1330,7 @@
                         </h2>
 
                         <p id="questionFormDescription">
-                            Set a room key above to unlock this form.
+                            Select one of your rooms above to unlock this form.
                         </p>
 
                     </div>
@@ -1548,7 +1680,7 @@
                 class="nav-button student-nav"
                 data-student-page="studentProgress"
             >
-                Progress
+                Learning Progress
             </button>
 
 
@@ -1556,7 +1688,7 @@
                 class="nav-button student-nav"
                 data-student-page="studentQuiz"
             >
-                Quiz Results
+                Learning Records
             </button>
 
 
@@ -1754,16 +1886,28 @@
                     </span>
 
                     <h1>
-                        Progress
+                        My Learning Progress
                     </h1>
 
                     <p>
-                        Track your Tuklask game progression.
+                        Live progress from your current learning-tool room.
                     </p>
 
                 </div>
 
             </div>
+
+
+            <section class="panel learning-room-summary">
+                <div>
+                    <span class="stat-label">Room Key</span>
+                    <strong id="learningRoomKey">No room joined</strong>
+                </div>
+                <div>
+                    <span class="stat-label">Status</span>
+                    <strong id="learningRoomStatus">Not started</strong>
+                </div>
+            </section>
 
 
             <div class="large-card-grid">
@@ -1786,7 +1930,7 @@
                 <article class="large-card">
 
                     <span>
-                        Level
+                        Correct Answers
                     </span>
 
                     <strong id="progressLevel">
@@ -1801,7 +1945,7 @@
                 <article class="large-card">
 
                     <span>
-                        Total EXP
+                        Wrong Answers
                     </span>
 
                     <strong id="progressExp">
@@ -1816,7 +1960,7 @@
                 <article class="large-card">
 
                     <span>
-                        Stages Completed
+                        Monsters Defeated
                     </span>
 
                     <strong id="progressCompleted">
@@ -1846,11 +1990,11 @@
                     </span>
 
                     <h1>
-                        Quiz Results
+                        My Learning Records
                     </h1>
 
                     <p>
-                        Review your Tuklask quiz performance.
+                        Review the latest result saved by the Unity game.
                     </p>
 
                 </div>
@@ -1863,6 +2007,20 @@
                 <article class="large-card">
 
                     <span>
+                        Room Key
+                    </span>
+
+                    <strong id="recordRoomKey">
+                        -
+                    </strong>
+
+                    <div class="large-card-line blue-background"></div>
+
+                </article>
+
+                <article class="large-card">
+
+                    <span>
                         Correct Answers
                     </span>
 
@@ -1871,6 +2029,36 @@
                     </strong>
 
                     <div class="large-card-line blue-background"></div>
+
+                </article>
+
+
+                <article class="large-card">
+
+                    <span>
+                        Total Questions
+                    </span>
+
+                    <strong id="recordTotalQuestions">
+                        0
+                    </strong>
+
+                    <div class="large-card-line blue-background"></div>
+
+                </article>
+
+
+                <article class="large-card">
+
+                    <span>
+                        Date Completed
+                    </span>
+
+                    <strong id="recordCompletedAt" class="stat-value-small">
+                        Not completed
+                    </strong>
+
+                    <div class="large-card-line red-background"></div>
 
                 </article>
 

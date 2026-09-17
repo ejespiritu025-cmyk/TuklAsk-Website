@@ -280,6 +280,12 @@ tbody tr:last-child td { border-bottom: 0; }
 .question-delete-button { border: 1px solid rgba(255,93,99,.28); background: var(--red-soft); color: #ff777c; }
 .question-delete-button:hover { background: var(--red); color: white; }
 .question-empty-state { height: 96px; color: var(--muted); text-align: center; white-space: normal; }
+.room-status { display: inline-flex; padding: 5px 8px; border-radius: 999px; font-size: 9px; font-weight: 800; }
+.room-status.active { border: 1px solid var(--teal-border); background: var(--teal-soft); color: var(--teal-bright); }
+.room-status.inactive { border: 1px solid rgba(255,93,99,.28); background: var(--red-soft); color: #ff777c; }
+.learning-room-summary { margin-bottom: 14px; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.learning-room-summary > div { display: flex; flex-direction: column; gap: 6px; }
+.learning-room-summary strong { color: var(--teal-bright); font-size: 14px; }
 
 /* DETAILS */
 

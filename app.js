@@ -67,9 +67,12 @@ let unsubscribeOwnedRooms = null;
 let unsubscribeAdminRoomUsers = [];
 let adminRoomStudentGroups = new Map();
 let ownedRoomKeys = [];
+let ownedRooms = [];
 let questions = [];
 let editingQuestionId = null;
 let unsubscribeQuestions = null;
+let unsubscribeStudentRoom = null;
+let currentRoomMembership = null;
 let activeRoomKey = "";
 
 
@@ -183,6 +186,11 @@ function calculateGlobalRanking(list) {
 ================================================== */
 
 function getStagesCompleted(student) {
+    if (Number.isFinite(student.monstersDefeated)) {
+        return student.monstersDefeated;
+    }
+
+
     return Math.max(
         Number(student.progress.currentStage) - 1,
         0
@@ -210,6 +218,72 @@ function calculateAccuracy(student) {
     return Math.round(
         (correct / total) * 100
     );
+}
+
+
+function normalizeRoomMember(uid, roomKey, member) {
+    const progress = member?.progress || {};
+    const result = member?.result || {};
+    const monstersDefeated = [
+        progress.monster1Defeated,
+        progress.monster2Defeated,
+        progress.monster3Defeated
+    ].filter(Boolean).length;
+    const correct = Number(
+        result.correct ?? progress.correct ?? 0
+    );
+    const wrong = Number(
+        result.wrong ?? progress.wrong ?? 0
+    );
+    const currentStage = Number(
+        progress.currentStage ||
+        (member?.status === "completed"
+            ? 3
+            : monstersDefeated + 1)
+    );
+
+
+    return {
+        uid,
+        membershipId: `${roomKey}:${uid}`,
+        email: "",
+        fullName: String(member?.fullName || ""),
+        nickname: String(
+            member?.nickname ||
+            member?.fullName ||
+            "Unknown Player"
+        ),
+        studentNumber: String(
+            member?.studentNumber || ""
+        ),
+        yearSection: [
+            member?.yearLevel,
+            member?.section
+        ].filter(Boolean).join(" / ") || "N/A",
+        roomKey: normalizeRoomKey(
+            member?.roomKey || roomKey
+        ),
+        status: String(
+            member?.status || "in_progress"
+        ),
+        joinedAt: Number(member?.joinedAt || 0),
+        completedAt: Number(result.completedAt || 0),
+        monstersDefeated,
+        totalQuestions: Number(
+            result.totalQuestions || correct + wrong
+        ),
+        progress: {
+            currentStage,
+            exp: Number(progress.exp || correct * 100),
+            level: Number(
+                progress.level || monstersDefeated + 1
+            )
+        },
+        statistics: {
+            correctAnswers: correct,
+            wrongAnswers: wrong
+        }
+    };
 }
 
 
@@ -536,7 +610,7 @@ async function handleLogin() {
 
 
             /*
-               Admin reads all users.
+               Admin listens to members of owned rooms.
             */
 
             startUsersListener();
@@ -579,6 +653,12 @@ async function handleLogin() {
             currentUser = {
                 uid: firebaseUser.uid,
                 email: firebaseUser.email || email,
+                roomKey: normalizeRoomKey(
+                    studentSnapshot.val()?.roomKey || ""
+                ),
+                studentNumber: String(
+                    studentSnapshot.val()?.studentNumber || ""
+                ),
                 accountType: "student"
             };
 
@@ -609,6 +689,10 @@ async function handleLogin() {
             */
 
             startUsersListener();
+            startStudentRoomListener(
+                currentUser.roomKey,
+                currentUser.studentNumber
+            );
 
             return;
         }
@@ -683,8 +767,8 @@ async function handleLogin() {
    FIREBASE USERS LISTENERS
 
    Students retain the existing global leaderboard.
-   Teacher/Admin accounts query only students whose
-   /users profile contains a roomKey owned by them.
+   Teacher/Admin accounts listen only to /roomMembers
+   under room keys they own.
 ================================================== */
 
 function startUsersListener() {
@@ -754,17 +838,37 @@ function startAdminRoomUsersListener() {
 
                 const rooms = snapshot.val() || {};
 
+                ownedRooms = Object.entries(rooms)
+                    .map(([key, room]) => ({
+                        key,
+                        ...room,
+                        active: room?.active !== false
+                    }))
+                    .sort((a, b) =>
+                        a.key.localeCompare(b.key)
+                    );
+
                 ownedRoomKeys =
-                    Object.keys(rooms)
-                        .sort((a, b) =>
-                            a.localeCompare(b)
-                        );
+                    ownedRooms.map(room => room.key);
+
+
+                populateOwnedRoomSelectors();
+                renderRooms();
 
 
                 if (!ownedRoomKeys.length) {
                     students = [];
+                    clearActiveRoomKey();
                     renderEverything();
                     return;
+                }
+
+
+                if (
+                    activeRoomKey &&
+                    !ownedRoomKeys.includes(activeRoomKey)
+                ) {
+                    clearActiveRoomKey();
                 }
 
 
@@ -776,10 +880,9 @@ function startAdminRoomUsersListener() {
 
 
                     const roomStudentsReference =
-                        query(
-                            ref(database, "users"),
-                            orderByChild("roomKey"),
-                            equalTo(roomKey)
+                        ref(
+                            database,
+                            `roomMembers/${roomKey}`
                         );
 
 
@@ -795,8 +898,9 @@ function startAdminRoomUsersListener() {
                                 roomKey,
                                 Object.entries(roomUsers)
                                     .map(([uid, user]) =>
-                                        normalizeStudent(
+                                        normalizeRoomMember(
                                             uid,
+                                            roomKey,
                                             user
                                         )
                                     )
@@ -808,7 +912,7 @@ function startAdminRoomUsersListener() {
 
                         error => {
                             console.error(
-                                `Firebase users read failed for room ${roomKey}:`,
+                                `Firebase room members read failed for room ${roomKey}:`,
                                 error
                             );
 
@@ -853,7 +957,7 @@ function rebuildAdminRoomStudents() {
         .forEach(roomStudents => {
             roomStudents.forEach(student => {
                 uniqueStudents.set(
-                    student.uid,
+                    student.membershipId,
                     student
                 );
             });
@@ -865,6 +969,7 @@ function rebuildAdminRoomStudents() {
     );
 
     renderEverything();
+    renderRooms();
 }
 
 
@@ -892,6 +997,85 @@ function stopUsersListeners() {
 
     stopAdminRoomUserListeners();
     ownedRoomKeys = [];
+    ownedRooms = [];
+}
+
+
+function startStudentRoomListener(
+    roomKey,
+    studentNumber = ""
+) {
+    if (unsubscribeStudentRoom) {
+        unsubscribeStudentRoom();
+        unsubscribeStudentRoom = null;
+    }
+
+
+    currentRoomMembership = null;
+
+
+    if (
+        currentRole !== "student" ||
+        !currentUser?.uid ||
+        !roomKey
+    ) {
+        renderCurrentStudent();
+        return;
+    }
+
+
+    const memberReference = studentNumber
+        ? query(
+            ref(database, `roomMembers/${roomKey}`),
+            orderByChild("studentNumber"),
+            equalTo(studentNumber)
+        )
+        : ref(
+            database,
+            `roomMembers/${roomKey}/${currentUser.uid}`
+        );
+
+
+    unsubscribeStudentRoom = onValue(
+        memberReference,
+        snapshot => {
+            if (!snapshot.exists()) {
+                currentRoomMembership = null;
+            }
+
+            else if (studentNumber) {
+                const firstMembership =
+                    Object.entries(snapshot.val())[0];
+
+
+                currentRoomMembership = firstMembership
+                    ? normalizeRoomMember(
+                        firstMembership[0],
+                        roomKey,
+                        firstMembership[1]
+                    )
+                    : null;
+            }
+
+            else {
+                currentRoomMembership = normalizeRoomMember(
+                    currentUser.uid,
+                    roomKey,
+                    snapshot.val()
+                );
+            }
+
+            renderCurrentStudent();
+        },
+        error => {
+            console.error(
+                "Firebase student room progress read failed:",
+                error
+            );
+            currentRoomMembership = null;
+            renderCurrentStudent();
+        }
+    );
 }
 
 
@@ -901,6 +1085,15 @@ function stopUsersListeners() {
 
 function stopFirebaseListeners() {
     stopUsersListeners();
+
+
+    if (unsubscribeStudentRoom) {
+        unsubscribeStudentRoom();
+        unsubscribeStudentRoom = null;
+    }
+
+
+    currentRoomMembership = null;
 
 
     if (unsubscribeQuestions) {
@@ -1087,6 +1280,193 @@ function normalizeRoomKey(value) {
 }
 
 
+function populateOwnedRoomSelectors() {
+    const selector = document.getElementById(
+        "questionActiveRoomSelect"
+    );
+
+
+    if (!selector) {
+        return;
+    }
+
+
+    const previousValue = activeRoomKey;
+
+
+    selector.innerHTML = ownedRooms.length
+        ? '<option value="">Select a room</option>'
+        : '<option value="">Create a room first</option>';
+
+
+    ownedRooms.forEach(room => {
+        const option = document.createElement("option");
+        option.value = room.key;
+        option.textContent = `${room.key} — ${room.gradeLevel || ""} ${room.section || ""}${room.active === false ? " (Inactive)" : ""}`.trim();
+        selector.appendChild(option);
+    });
+
+
+    if (ownedRoomKeys.includes(previousValue)) {
+        selector.value = previousValue;
+    }
+}
+
+
+function renderRooms() {
+    const tbody = document.getElementById("roomTable");
+    const count = document.getElementById("roomCount");
+
+
+    if (!tbody || !count) {
+        return;
+    }
+
+
+    count.textContent = `${ownedRooms.length} ${ownedRooms.length === 1 ? "room" : "rooms"}`;
+
+
+    if (!ownedRooms.length) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="question-empty-state">
+                    Create your first room above.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+
+    tbody.innerHTML = ownedRooms.map(room => {
+        const memberCount = (
+            adminRoomStudentGroups.get(room.key) || []
+        ).length;
+
+
+        return `
+            <tr>
+                <td><strong>${escapeHTML(room.key)}</strong></td>
+                <td>${escapeHTML(room.gradeLevel || "-")} / ${escapeHTML(room.section || "-")}</td>
+                <td>
+                    <span class="room-status ${room.active === false ? "inactive" : "active"}">
+                        ${room.active === false ? "Inactive" : "Active"}
+                    </span>
+                </td>
+                <td>${memberCount}</td>
+                <td>
+                    <div class="question-actions">
+                        <button class="question-edit-button" type="button" data-room-action="use" data-room-key="${escapeHTML(room.key)}">Use</button>
+                        <button class="question-edit-button" type="button" data-room-action="toggle" data-room-key="${escapeHTML(room.key)}">
+                            ${room.active === false ? "Activate" : "Deactivate"}
+                        </button>
+                        <button class="question-delete-button" type="button" data-room-action="delete" data-room-key="${escapeHTML(room.key)}">Delete</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join("");
+}
+
+
+function useOwnedRoom(roomKey, openQuestions = true) {
+    const room = ownedRooms.find(
+        item => item.key === roomKey
+    );
+
+
+    if (!room) {
+        return;
+    }
+
+
+    setRoomDetailsForm(room);
+    document.getElementById("questionRoomKey").value = room.key;
+    setActiveRoomKey(room.key, false);
+    setRoomKeyMessage(
+        `Room ${room.key} is selected${room.active === false ? " but currently inactive" : ""}.`
+    );
+
+
+    if (openQuestions) {
+        showAdminSection("questionManagement");
+    }
+}
+
+
+async function toggleRoomStatus(roomKey) {
+    const room = ownedRooms.find(
+        item => item.key === roomKey
+    );
+
+
+    if (!room || !hasAdminQuestionAccess()) {
+        return;
+    }
+
+
+    try {
+        await update(
+            ref(database, `roomKeys/${roomKey}`),
+            {
+                active: room.active === false,
+                updatedAt: serverTimestamp(),
+                updatedBy: currentUser.uid
+            }
+        );
+    }
+    catch (error) {
+        console.error("Firebase room status update failed:", error);
+        alert("Unable to change the room status. Check your connection and Firebase rules.");
+    }
+}
+
+
+async function deleteRoom(roomKey) {
+    if (!hasAdminQuestionAccess()) {
+        return;
+    }
+
+
+    const shouldDelete = window.confirm(
+        `Delete room ${roomKey}? Empty rooms only can be deleted.`
+    );
+
+
+    if (!shouldDelete) {
+        return;
+    }
+
+
+    try {
+        const membersSnapshot = await get(
+            ref(database, `roomMembers/${roomKey}`)
+        );
+        const roomHasQuestions = questions.some(
+            question => question.roomKey === roomKey
+        );
+
+
+        if (membersSnapshot.exists() || roomHasQuestions) {
+            alert("This room still has students or questions. Remove those records first so learning data is not lost.");
+            return;
+        }
+
+
+        await remove(ref(database, `roomKeys/${roomKey}`));
+
+
+        if (activeRoomKey === roomKey) {
+            clearActiveRoomKey();
+        }
+    }
+    catch (error) {
+        console.error("Firebase room delete failed:", error);
+        alert("Unable to delete the room. Check your connection and Firebase rules.");
+    }
+}
+
+
 function setRoomKeyMessage(message, isError = false) {
     const messageElement =
         document.getElementById(
@@ -1186,6 +1566,16 @@ function setActiveRoomKey(
         .getElementById("questionRoomKey")
         .value = activeRoomKey;
 
+
+    const activeRoomSelector = document.getElementById(
+        "questionActiveRoomSelect"
+    );
+
+
+    if (activeRoomSelector) {
+        activeRoomSelector.value = activeRoomKey;
+    }
+
     document
         .getElementById("questionFormFields")
         .disabled = false;
@@ -1201,7 +1591,7 @@ function setActiveRoomKey(
 
     document
         .getElementById("activateRoomKeyButton")
-        .textContent = "Switch Room Key";
+        .textContent = "Save / Open Room";
 
     document
         .getElementById(
@@ -1326,42 +1716,33 @@ async function activateRoomKeyFromInput() {
             }
 
 
-            const savedRoomValidationError =
-                validateRoomDetails(savedRoom);
+            const enteredRoomDetails =
+                getRoomDetailsFromForm();
+            const enteredValidationError =
+                validateRoomDetails(enteredRoomDetails);
 
 
-            if (savedRoomValidationError) {
-                const repairedRoomDetails =
-                    getRoomDetailsFromForm();
-
-                const repairValidationError =
-                    validateRoomDetails(
-                        repairedRoomDetails
-                    );
-
-
-                if (repairValidationError) {
-                    setRoomKeyMessage(
-                        "This existing room is missing its details. Enter the teacher name, grade level and section, then try again.",
-                        true
-                    );
-
-                    return;
-                }
-
-
+            if (!enteredValidationError) {
                 await update(
                     roomKeyReference,
                     {
-                        ...repairedRoomDetails,
+                        ...enteredRoomDetails,
                         updatedAt: serverTimestamp(),
                         updatedBy: currentUser.uid
                     }
                 );
             }
 
-            else {
+            else if (!validateRoomDetails(savedRoom)) {
                 setRoomDetailsForm(savedRoom);
+            }
+
+            else {
+                setRoomKeyMessage(
+                    "This existing room is missing details. Enter the teacher name, grade level and section, then try again.",
+                    true
+                );
+                return;
             }
         }
 
@@ -1388,6 +1769,7 @@ async function activateRoomKeyFromInput() {
                 {
                     key: normalizedRoomKey,
                     ...roomDetails,
+                    active: true,
                     createdAt: serverTimestamp(),
                     createdBy: currentUser.uid,
                     updatedAt: serverTimestamp(),
@@ -1424,8 +1806,8 @@ async function activateRoomKeyFromInput() {
         activateButton.disabled = false;
         activateButton.textContent =
             activeRoomKey
-                ? "Switch Room Key"
-                : "Set Room Key";
+                ? "Save / Open Room"
+                : "Create / Open Room";
     }
 }
 
@@ -1455,13 +1837,23 @@ function clearActiveRoomKey() {
 
     document
         .getElementById("activateRoomKeyButton")
-        .textContent = "Set Room Key";
+        .textContent = "Create / Open Room";
+
+
+    const activeRoomSelector = document.getElementById(
+        "questionActiveRoomSelect"
+    );
+
+
+    if (activeRoomSelector) {
+        activeRoomSelector.value = "";
+    }
 
 
     resetQuestionForm();
 
     setRoomKeyMessage(
-        "Set a room key to unlock the question form."
+        "Create or open a room before adding questions."
     );
 }
 
@@ -1772,7 +2164,7 @@ function resetQuestionForm(clearMessage = true) {
         .textContent =
             activeRoomKey
                 ? `New questions will be added to room ${activeRoomKey}.`
-                : "Set a room key above to unlock this form.";
+                : "Select one of your rooms above to unlock this form.";
 
     document
         .getElementById("saveQuestionButton")
@@ -2014,7 +2406,7 @@ function editQuestion(questionId) {
 
     if (!activeRoomKey) {
         setRoomKeyMessage(
-            "Set a room key before editing this unassigned question.",
+            "Select a room before editing this unassigned question.",
             true
         );
 
@@ -2274,6 +2666,66 @@ document
     );
 
 
+document
+    .getElementById("questionActiveRoomSelect")
+    .addEventListener(
+        "change",
+        event => {
+            const roomKey = event.target.value;
+
+
+            if (roomKey) {
+                useOwnedRoom(roomKey, false);
+            }
+
+            else {
+                clearActiveRoomKey();
+            }
+        }
+    );
+
+
+document
+    .getElementById("openRoomManagementButton")
+    .addEventListener(
+        "click",
+        () => showAdminSection("roomManagement")
+    );
+
+
+document
+    .getElementById("roomTable")
+    .addEventListener(
+        "click",
+        event => {
+            const button = event.target.closest(
+                "[data-room-action]"
+            );
+
+
+            if (!button) {
+                return;
+            }
+
+
+            const roomKey = button.dataset.roomKey;
+
+
+            if (button.dataset.roomAction === "use") {
+                useOwnedRoom(roomKey);
+            }
+
+            else if (button.dataset.roomAction === "toggle") {
+                toggleRoomStatus(roomKey);
+            }
+
+            else if (button.dataset.roomAction === "delete") {
+                deleteRoom(roomKey);
+            }
+        }
+    );
+
+
 /* ==================================================
    STUDENT NAVIGATION
 ================================================== */
@@ -2404,6 +2856,11 @@ function renderAdminDashboard() {
 
     const active =
         students.filter(student => {
+            if (student.status) {
+                return student.status === "in_progress";
+            }
+
+
             return (
                 student.progress.exp > 0 ||
                 student.progress.currentStage > 0 ||
@@ -2867,7 +3324,9 @@ function renderStudentManagement() {
             <td>
                 <button
                     class="view-button"
-                    data-student-id="${student.uid}"
+                    data-student-id="${escapeHTML(
+                        student.membershipId || student.uid
+                    )}"
                 >
                     View
                 </button>
@@ -2904,7 +3363,7 @@ function showStudentDetails(uid) {
     const student =
         students.find(
             student =>
-                student.uid === uid
+                (student.membershipId || student.uid) === uid
         );
 
 
@@ -3553,7 +4012,7 @@ function renderCurrentStudent() {
     }
 
 
-    const student =
+    const profile =
         students.find(
             student =>
                 student.uid ===
@@ -3561,7 +4020,15 @@ function renderCurrentStudent() {
         );
 
 
+    const learning = currentRoomMembership;
+    const student = learning || profile;
+
+
     if (!student) {
+        document.getElementById("learningRoomKey").textContent =
+            currentUser.roomKey || "No room joined";
+        document.getElementById("learningRoomStatus").textContent =
+            "No Unity progress found";
         return;
     }
 
@@ -3587,13 +4054,13 @@ function renderCurrentStudent() {
     document
         .getElementById("studentName")
         .textContent =
-            student.nickname;
+            profile?.nickname || student.nickname;
 
 
     document
         .getElementById("studentEmail")
         .textContent =
-            student.email;
+            currentUser.email || profile?.email || "";
 
 
     document
@@ -3619,13 +4086,30 @@ function renderCurrentStudent() {
     document
         .getElementById("studentNumber")
         .textContent =
-            student.studentNumber;
+            student.studentNumber || profile?.studentNumber || "-";
 
 
     document
         .getElementById("studentSection")
         .textContent =
-            student.yearSection;
+            student.yearSection || profile?.yearSection || "-";
+
+
+    document
+        .getElementById("learningRoomKey")
+        .textContent =
+            learning?.roomKey ||
+            currentUser.roomKey ||
+            "No room joined";
+
+
+    document
+        .getElementById("learningRoomStatus")
+        .textContent = learning
+            ? (learning.status === "completed"
+                ? "Completed"
+                : "In progress")
+            : "No Unity progress found";
 
 
     document
@@ -3637,15 +4121,13 @@ function renderCurrentStudent() {
     document
         .getElementById("progressLevel")
         .textContent =
-            student.progress.level;
+            student.statistics.correctAnswers;
 
 
     document
         .getElementById("progressExp")
         .textContent =
-            formatNumber(
-                student.progress.exp
-            );
+            student.statistics.wrongAnswers;
 
 
     document
@@ -3653,6 +4135,7 @@ function renderCurrentStudent() {
             "progressCompleted"
         )
         .textContent =
+            learning?.monstersDefeated ??
             getStagesCompleted(student);
 
 
@@ -3672,6 +4155,33 @@ function renderCurrentStudent() {
         .getElementById("quizResult")
         .textContent =
             `${calculateAccuracy(student)}%`;
+
+
+    document
+        .getElementById("recordRoomKey")
+        .textContent =
+            learning?.roomKey ||
+            currentUser.roomKey ||
+            "-";
+
+
+    document
+        .getElementById("recordTotalQuestions")
+        .textContent =
+            learning?.totalQuestions ||
+            (
+                student.statistics.correctAnswers +
+                student.statistics.wrongAnswers
+            );
+
+
+    document
+        .getElementById("recordCompletedAt")
+        .textContent = learning?.completedAt
+            ? new Date(
+                learning.completedAt
+            ).toLocaleString()
+            : "Not completed";
 }
 
 
