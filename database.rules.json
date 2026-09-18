@@ -1,0 +1,227 @@
+{
+  "rules": {
+    "admins": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid && auth.token.email_verified == true && root.child('teacherRegistrations').child($uid).exists() && newData.val() == true"
+      }
+    },
+    "teacherRegistrations": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid && ((!data.exists() && newData.child('uid').val() == auth.uid && newData.child('email').val() == auth.token.email && newData.child('status').val() == 'pending_verification') || (data.exists() && auth.token.email_verified == true && newData.child('uid').val() == data.child('uid').val() && newData.child('email').val() == data.child('email').val() && newData.child('displayName').val() == data.child('displayName').val() && newData.child('requestedAt').val() == data.child('requestedAt').val() && newData.child('status').val() == 'active'))",
+        ".validate": "newData.hasChildren(['uid', 'email', 'displayName', 'status', 'requestedAt', 'updatedAt']) && newData.child('uid').isString() && newData.child('email').isString() && newData.child('displayName').isString() && newData.child('displayName').val().length > 0 && newData.child('displayName').val().length <= 150 && newData.child('requestedAt').isNumber() && newData.child('updatedAt').isNumber()"
+      }
+    },
+    "users": {
+      ".indexOn": ["roomKey"],
+      ".read": "auth != null && (root.child('users').child(auth.uid).exists() || (query.orderByChild == 'roomKey' && query.equalTo != null && root.child('roomKeys').child(query.equalTo).child('createdBy').val() == auth.uid && (auth.token.role == 'teacher' || auth.token.teacher == true || root.child('admins').child(auth.uid).val() == true)))",
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid",
+        ".validate": "newData.hasChildren(['email', 'nickname'])",
+        "email": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "nickname": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        "studentNumber": {
+          ".validate": "newData.isString() && newData.val().matches(/^[0-9]{1,30}$/)"
+        },
+        "yearSection": {
+          ".validate": "newData.isString()"
+        },
+        "roomKey": {
+          ".validate": "newData.isString() && newData.val().matches(/^[A-Z0-9_-]{4,24}$/) && root.child('roomKeys').child(newData.val()).exists()"
+        }
+      }
+    },
+    "studentNumbers": {
+      "$studentNumber": {
+        ".read": true,
+        ".write": "auth != null && !data.exists() && newData.val() == auth.uid",
+        ".validate": "$studentNumber.matches(/^[0-9]{1,30}$/) && newData.isString() && newData.val() == auth.uid"
+      }
+    },
+    "roomKeys": {
+      ".indexOn": ["createdBy"],
+      ".read": "auth != null && (root.child('users').child(auth.uid).exists() || (query.orderByChild == 'createdBy' && query.equalTo == auth.uid && (auth.token.role == 'teacher' || auth.token.teacher == true || root.child('admins').child(auth.uid).val() == true)))",
+      "$roomKey": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.token.role == 'teacher' || auth.token.teacher == true || root.child('admins').child(auth.uid).val() == true) && ((!data.exists() && newData.exists() && newData.child('createdBy').val() == auth.uid) || (data.exists() && data.child('createdBy').val() == auth.uid && (!newData.exists() || newData.child('createdBy').val() == auth.uid)))",
+        ".validate": "$roomKey.matches(/^[A-Z0-9_-]{4,24}$/) && newData.hasChildren(['key', 'teacherName', 'gradeLevel', 'section', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])",
+        "key": {
+          ".validate": "newData.isString() && newData.val() == $roomKey"
+        },
+        "teacherName": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100"
+        },
+        "gradeLevel": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40"
+        },
+        "section": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60"
+        },
+        "active": {
+          ".validate": "newData.isBoolean()"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "createdBy": {
+          ".validate": "newData.isString() && newData.val() == auth.uid"
+        },
+        "updatedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "updatedBy": {
+          ".validate": "newData.isString() && newData.val() == auth.uid"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "questions": {
+      ".indexOn": ["roomKey", "createdBy"],
+      ".read": "auth != null && ((query.orderByChild == 'createdBy' && query.equalTo == auth.uid && (auth.token.role == 'teacher' || auth.token.teacher == true || root.child('admins').child(auth.uid).val() == true)) || (query.orderByChild == 'roomKey' && query.equalTo != null && root.child('roomKeys').child(query.equalTo).exists() && root.child('roomKeys').child(query.equalTo).child('active').val() != false))",
+      "$questionId": {
+        ".write": "auth != null && (auth.token.role == 'teacher' || auth.token.teacher == true || root.child('admins').child(auth.uid).val() == true) && ((!data.exists() && newData.exists() && newData.child('createdBy').val() == auth.uid && root.child('roomKeys').child(newData.child('roomKey').val()).child('createdBy').val() == auth.uid) || (data.exists() && data.child('createdBy').val() == auth.uid && (!newData.exists() || (newData.child('createdBy').val() == auth.uid && root.child('roomKeys').child(newData.child('roomKey').val()).child('createdBy').val() == auth.uid))))",
+        ".validate": "newData.hasChildren(['text', 'options', 'roomKey', 'correctAnswer', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy']) && root.child('roomKeys').child(newData.child('roomKey').val()).exists()",
+        "text": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 500"
+        },
+        "options": {
+          ".validate": "newData.hasChildren(['A', 'B', 'C', 'D'])",
+          "A": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 200"
+          },
+          "B": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 200"
+          },
+          "C": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 200"
+          },
+          "D": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 200"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "roomKey": {
+          ".validate": "newData.isString() && newData.val().matches(/^[A-Z0-9_-]{4,24}$/)"
+        },
+        "correctAnswer": {
+          ".validate": "newData.isString() && newData.val().matches(/^(A|B|C|D)$/)"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "createdBy": {
+          ".validate": "newData.isString() && newData.val() == auth.uid"
+        },
+        "updatedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "updatedBy": {
+          ".validate": "newData.isString() && newData.val() == auth.uid"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "roomMembers": {
+      "$roomKey": {
+        ".indexOn": ["studentNumber"],
+        ".read": "auth != null && root.child('roomKeys').child($roomKey).exists()",
+        "$uid": {
+          ".read": "auth != null && (auth.uid == $uid || root.child('roomKeys').child($roomKey).child('createdBy').val() == auth.uid)",
+          ".write": "auth != null && auth.uid == $uid && root.child('roomKeys').child($roomKey).exists() && (data.exists() || root.child('roomKeys').child($roomKey).child('active').val() != false)",
+          ".validate": "newData.hasChildren(['fullName', 'studentNumber', 'nickname', 'roomKey', 'status', 'joinedAt'])",
+          "fullName": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 150"
+          },
+          "studentNumber": {
+            ".validate": "newData.isString() && newData.val().matches(/^[0-9]{1,30}$/)"
+          },
+          "nickname": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100"
+          },
+          "roomKey": {
+            ".validate": "newData.isString() && newData.val() == $roomKey"
+          },
+          "teacherName": {
+            ".validate": "newData.isString()"
+          },
+          "yearLevel": {
+            ".validate": "newData.isString()"
+          },
+          "section": {
+            ".validate": "newData.isString()"
+          },
+          "status": {
+            ".validate": "newData.isString() && (newData.val() == 'in_progress' || newData.val() == 'completed')"
+          },
+          "joinedAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "progress": {
+            "monster1QuestionIndex": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "monster2QuestionIndex": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "monster3QuestionIndex": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "currentStage": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "level": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "exp": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "correct": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "wrong": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "monster1Defeated": {
+              ".validate": "newData.isBoolean()"
+            },
+            "monster2Defeated": {
+              ".validate": "newData.isBoolean()"
+            },
+            "monster3Defeated": {
+              ".validate": "newData.isBoolean()"
+            },
+            "updatedAt": {
+              ".validate": "newData.isNumber()"
+            }
+          },
+          "result": {
+            "correct": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "wrong": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "totalQuestions": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            },
+            "completedAt": {
+              ".validate": "newData.isNumber()"
+            }
+          }
+        }
+      }
+    }
+  }
+}

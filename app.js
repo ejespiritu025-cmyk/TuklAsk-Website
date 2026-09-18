@@ -11,7 +11,11 @@ import {
     createUserWithEmailAndPassword,
     updateProfile,
     signInWithEmailAndPassword,
-    signOut
+    signOut,
+    sendEmailVerification,
+    reload,
+    getIdTokenResult,
+    deleteUser
 } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
 
 import {
@@ -62,10 +66,14 @@ const database = getDatabase(firebaseApp);
 let currentUser = null;
 let currentRole = null;
 let students = [];
+let generalKnowledgeStudents = [];
+let learningBasedStudents = [];
 let unsubscribeUsers = null;
 let unsubscribeOwnedRooms = null;
 let unsubscribeAdminRoomUsers = [];
+let unsubscribeAdminGeneralUsers = [];
 let adminRoomStudentGroups = new Map();
+let adminGeneralStudentGroups = new Map();
 let ownedRoomKeys = [];
 let ownedRooms = [];
 let questions = [];
@@ -73,7 +81,17 @@ let editingQuestionId = null;
 let unsubscribeQuestions = null;
 let unsubscribeStudentRoom = null;
 let currentRoomMembership = null;
+let studentRoomHistory = [];
+let selectedStudentRoomKey = "";
+let studentLearningLeaderboard = [];
+let studentLearningLeaderboardsByRoom = new Map();
+let studentRoomDetails = new Map();
+let studentRoomHistoryLoadId = 0;
+let studentRoomHistoryDiscoveryLimited = false;
 let activeRoomKey = "";
+let pendingCsvQuestions = [];
+let pendingCsvErrors = [];
+let pendingCsvRoomKey = "";
 
 
 /* ==================================================
@@ -109,6 +127,7 @@ function formatNumber(value) {
 function normalizeStudent(uid, user) {
     return {
         uid,
+        recordType: "general",
 
         email: user?.email || "",
 
@@ -236,7 +255,7 @@ function normalizeRoomMember(uid, roomKey, member) {
         result.wrong ?? progress.wrong ?? 0
     );
     const currentStage = Number(
-        progress.currentStage ||
+        progress.currentStage ??
         (member?.status === "completed"
             ? 3
             : monstersDefeated + 1)
@@ -245,6 +264,7 @@ function normalizeRoomMember(uid, roomKey, member) {
 
     return {
         uid,
+        recordType: "learning",
         membershipId: `${roomKey}:${uid}`,
         email: "",
         fullName: String(member?.fullName || ""),
@@ -263,6 +283,9 @@ function normalizeRoomMember(uid, roomKey, member) {
         roomKey: normalizeRoomKey(
             member?.roomKey || roomKey
         ),
+        teacherName: String(member?.teacherName || ""),
+        yearLevel: String(member?.yearLevel || ""),
+        section: String(member?.section || ""),
         status: String(
             member?.status || "in_progress"
         ),
@@ -270,13 +293,13 @@ function normalizeRoomMember(uid, roomKey, member) {
         completedAt: Number(result.completedAt || 0),
         monstersDefeated,
         totalQuestions: Number(
-            result.totalQuestions || correct + wrong
+            result.totalQuestions ?? correct + wrong
         ),
         progress: {
             currentStage,
-            exp: Number(progress.exp || correct * 100),
+            exp: Number(progress.exp ?? correct * 100),
             level: Number(
-                progress.level || monstersDefeated + 1
+                progress.level ?? monstersDefeated + 1
             )
         },
         statistics: {
@@ -347,6 +370,8 @@ document
 
 
 async function handleAdminRegistration() {
+    let createdUser = null;
+    let teacherIntentRegistered = false;
     const fullName = document
         .getElementById("registerName")
         .value
@@ -413,11 +438,34 @@ async function handleAdminRegistration() {
                 password
             );
 
+        createdUser = credential.user;
+
         await updateProfile(
             credential.user,
             {
                 displayName: fullName
             }
+        );
+
+        await set(
+            ref(
+                database,
+                `teacherRegistrations/${credential.user.uid}`
+            ),
+            {
+                uid: credential.user.uid,
+                email: credential.user.email || email,
+                displayName: fullName,
+                status: "pending_verification",
+                requestedAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            }
+        );
+
+        teacherIntentRegistered = true;
+
+        await sendEmailVerification(
+            credential.user
         );
 
         await signOut(auth);
@@ -426,10 +474,6 @@ async function handleAdminRegistration() {
         document
             .getElementById("loginEmail")
             .value = email;
-
-        document
-            .getElementById("loginRole")
-            .value = "admin";
 
         document
             .getElementById("registerPassword")
@@ -441,7 +485,7 @@ async function handleAdminRegistration() {
 
 
         showLoginPage(
-            "Account created. You can now sign in as Teacher / Admin."
+            "Teacher account created. Check your email and click the verification link, then sign in to activate your Teacher dashboard."
         );
     }
 
@@ -451,6 +495,30 @@ async function handleAdminRegistration() {
             error
         );
 
+
+        if (createdUser && !teacherIntentRegistered) {
+            try {
+                await deleteUser(createdUser);
+            }
+            catch (cleanupError) {
+                console.error(
+                    "Unable to remove incomplete teacher account:",
+                    cleanupError
+                );
+            }
+        }
+
+        if (auth.currentUser) {
+            try {
+                await signOut(auth);
+            }
+            catch (signOutError) {
+                console.error(
+                    "Registration cleanup sign out failed:",
+                    signOutError
+                );
+            }
+        }
 
         switch (error.code) {
             case "auth/email-already-in-use":
@@ -471,6 +539,12 @@ async function handleAdminRegistration() {
             case "auth/network-request-failed":
                 errorElement.textContent =
                     "Network error. Check your internet connection.";
+                break;
+
+            case "PERMISSION_DENIED":
+            case "permission_denied":
+                errorElement.textContent =
+                    "Firebase blocked teacher registration. Deploy the updated Realtime Database rules and try again.";
                 break;
 
             default:
@@ -517,11 +591,6 @@ async function handleLogin() {
             .getElementById("loginPassword")
             .value;
 
-    const selectedRole =
-        document
-            .getElementById("loginRole")
-            .value;
-
     const errorElement =
         document.getElementById("loginError");
 
@@ -552,14 +621,6 @@ async function handleLogin() {
     }
 
 
-    if (!selectedRole) {
-        errorElement.textContent =
-            "Select your role.";
-
-        return;
-    }
-
-
     loginButton.disabled = true;
     loginButton.textContent = "Signing in...";
 
@@ -578,124 +639,88 @@ async function handleLogin() {
 
         const firebaseUser = credential.user;
 
+        await reload(firebaseUser);
 
-        /* ==================================================
-           ADMIN LOGIN
-        ================================================== */
+        let tokenResult = await getIdTokenResult(
+            firebaseUser,
+            true
+        );
 
-        if (selectedRole === "admin") {
-            currentUser = {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email || email,
-                displayName:
-                    firebaseUser.displayName || "",
-                accountType: "admin"
-            };
+        const [adminSnapshot, teacherRegistrationSnapshot] =
+            await Promise.all([
+                get(ref(database, `admins/${firebaseUser.uid}`)),
+                get(ref(
+                    database,
+                    `teacherRegistrations/${firebaseUser.uid}`
+                ))
+            ]);
 
-            currentRole = "admin";
+        const adminRecord = adminSnapshot.val();
+        const hasTeacherRole =
+            tokenResult.claims.role === "teacher" ||
+            tokenResult.claims.teacher === true ||
+            adminRecord === true ||
+            adminRecord?.active === true ||
+            adminRecord?.role === "teacher";
 
-
-            document
-                .getElementById("roomTeacherName")
-                .value = currentUser.displayName;
-
-
-            showAdminSection(
-                "adminDashboard"
-            );
-
-            showPage(
-                "adminPage"
-            );
-
-
-            /*
-               Admin listens to members of owned rooms.
-            */
-
-            startUsersListener();
-            startQuestionsListener();
-
+        if (hasTeacherRole) {
+            openTeacherDashboard(firebaseUser, email);
             return;
         }
 
+        if (teacherRegistrationSnapshot.exists()) {
+            if (!firebaseUser.emailVerified) {
+                try {
+                    await sendEmailVerification(firebaseUser);
+                }
+                catch (verificationError) {
+                    console.warn(
+                        "Verification email could not be resent:",
+                        verificationError
+                    );
+                }
 
-        /* ==================================================
-           STUDENT LOGIN
-        ================================================== */
-
-        if (selectedRole === "student") {
-            /*
-               First verify that this Firebase Auth account
-               has a Tuklask student profile.
-            */
-
-            const studentReference =
-                ref(
-                    database,
-                    `users/${firebaseUser.uid}`
-                );
-
-            const studentSnapshot =
-                await get(studentReference);
-
-
-            if (!studentSnapshot.exists()) {
                 await signOut(auth);
-
                 errorElement.textContent =
-                    "No Tuklask student profile was found for this account.";
-
+                    "Verify your teacher email first. A new verification email was requested; check your inbox and spam folder.";
                 return;
             }
 
-
-            currentUser = {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email || email,
-                roomKey: normalizeRoomKey(
-                    studentSnapshot.val()?.roomKey || ""
-                ),
-                studentNumber: String(
-                    studentSnapshot.val()?.studentNumber || ""
-                ),
-                accountType: "student"
-            };
-
-            currentRole = "student";
-
-
-            showStudentSection(
-                "studentDashboard"
+            await update(
+                ref(database),
+                {
+                    [`admins/${firebaseUser.uid}`]: true,
+                    [`teacherRegistrations/${firebaseUser.uid}/status`]:
+                        "active",
+                    [`teacherRegistrations/${firebaseUser.uid}/verifiedAt`]:
+                        serverTimestamp(),
+                    [`teacherRegistrations/${firebaseUser.uid}/activatedAt`]:
+                        serverTimestamp(),
+                    [`teacherRegistrations/${firebaseUser.uid}/updatedAt`]:
+                        serverTimestamp()
+                }
             );
 
-            showPage(
-                "studentPage"
-            );
-
-
-            /*
-               Student now reads the same /users data
-               used by the Admin leaderboard.
-
-               This allows:
-               - all-player ranking
-               - Top 5 / Top 10
-               - EXP sorting
-               - Level sorting
-               - section filtering
-               - searching
-               - current-player highlighting
-            */
-
-            startUsersListener();
-            startStudentRoomListener(
-                currentUser.roomKey,
-                currentUser.studentNumber
-            );
-
+            openTeacherDashboard(firebaseUser, email);
             return;
         }
+
+        const studentSnapshot = await get(
+            ref(database, `users/${firebaseUser.uid}`)
+        );
+
+        if (!studentSnapshot.exists()) {
+            await signOut(auth);
+            errorElement.textContent =
+                "No Tuklask user or teacher registration was found for this account.";
+            return;
+        }
+
+        openUserDashboard(
+            firebaseUser,
+            email,
+            studentSnapshot.val() || {}
+        );
     }
 
     catch (error) {
@@ -763,6 +788,50 @@ async function handleLogin() {
 }
 
 
+function openTeacherDashboard(firebaseUser, fallbackEmail = "") {
+    currentUser = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email || fallbackEmail,
+        displayName: firebaseUser.displayName || "",
+        accountType: "admin"
+    };
+
+    currentRole = "admin";
+
+    document
+        .getElementById("roomTeacherName")
+        .value = currentUser.displayName;
+
+    showAdminSection("adminDashboard");
+    showPage("adminPage");
+    startUsersListener();
+    startQuestionsListener();
+}
+
+
+function openUserDashboard(
+    firebaseUser,
+    fallbackEmail,
+    profile
+) {
+    currentUser = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email || fallbackEmail,
+        profile,
+        roomKey: normalizeRoomKey(profile?.roomKey || ""),
+        studentNumber: String(profile?.studentNumber || ""),
+        accountType: "student"
+    };
+
+    currentRole = "student";
+
+    showStudentSection("studentDashboard");
+    showPage("studentPage");
+    startUsersListener();
+    loadStudentRoomHistory();
+}
+
+
 /* ==================================================
    FIREBASE USERS LISTENERS
 
@@ -800,6 +869,38 @@ function startUsersListener() {
                             normalizeStudent(uid, user)
                         )
                 );
+
+                generalKnowledgeStudents = students;
+
+                if (
+                    currentRole === "student" &&
+                    currentUser?.uid &&
+                    firebaseUsers[currentUser.uid]
+                ) {
+                    const nextProfile = firebaseUsers[currentUser.uid];
+                    const previousKeys = [
+                        ...collectRoomKeysFromProfile(
+                            currentUser.profile || {}
+                        )
+                    ].sort().join("|");
+                    const nextKeys = [
+                        ...collectRoomKeysFromProfile(nextProfile)
+                    ].sort().join("|");
+
+                    currentUser.profile = nextProfile;
+                    currentUser.roomKey = normalizeRoomKey(
+                        nextProfile.roomKey || currentUser.roomKey
+                    );
+                    currentUser.studentNumber = String(
+                        nextProfile.studentNumber ||
+                        currentUser.studentNumber ||
+                        ""
+                    );
+
+                    if (previousKeys !== nextKeys) {
+                        loadStudentRoomHistory();
+                    }
+                }
 
 
                 renderEverything();
@@ -858,6 +959,8 @@ function startAdminRoomUsersListener() {
 
                 if (!ownedRoomKeys.length) {
                     students = [];
+                    generalKnowledgeStudents = [];
+                    learningBasedStudents = [];
                     clearActiveRoomKey();
                     renderEverything();
                     return;
@@ -898,11 +1001,20 @@ function startAdminRoomUsersListener() {
                                 roomKey,
                                 Object.entries(roomUsers)
                                     .map(([uid, user]) =>
-                                        normalizeRoomMember(
-                                            uid,
-                                            roomKey,
-                                            user
-                                        )
+                                        ({
+                                            ...normalizeRoomMember(
+                                                uid,
+                                                roomKey,
+                                                user
+                                            ),
+                                            teacherName: String(
+                                                user?.teacherName ||
+                                                ownedRooms.find(
+                                                    room => room.key === roomKey
+                                                )?.teacherName ||
+                                                ""
+                                            )
+                                        })
                                     )
                             );
 
@@ -929,6 +1041,48 @@ function startAdminRoomUsersListener() {
                     unsubscribeAdminRoomUsers.push(
                         unsubscribe
                     );
+
+
+                    adminGeneralStudentGroups.set(
+                        roomKey,
+                        []
+                    );
+
+                    const generalStudentsReference = query(
+                        ref(database, "users"),
+                        orderByChild("roomKey"),
+                        equalTo(roomKey)
+                    );
+
+                    const unsubscribeGeneral = onValue(
+                        generalStudentsReference,
+                        generalSnapshot => {
+                            const generalUsers =
+                                generalSnapshot.val() || {};
+
+                            adminGeneralStudentGroups.set(
+                                roomKey,
+                                Object.entries(generalUsers)
+                                    .map(([uid, user]) =>
+                                        normalizeStudent(uid, user)
+                                    )
+                            );
+
+                            rebuildAdminGeneralStudents();
+                        },
+                        error => {
+                            console.error(
+                                `Firebase general-knowledge users read failed for room ${roomKey}:`,
+                                error
+                            );
+                            adminGeneralStudentGroups.set(roomKey, []);
+                            rebuildAdminGeneralStudents();
+                        }
+                    );
+
+                    unsubscribeAdminGeneralUsers.push(
+                        unsubscribeGeneral
+                    );
                 });
             },
 
@@ -939,6 +1093,8 @@ function startAdminRoomUsersListener() {
                 );
 
                 students = [];
+                generalKnowledgeStudents = [];
+                learningBasedStudents = [];
                 renderEverything();
 
                 alert(
@@ -964,12 +1120,71 @@ function rebuildAdminRoomStudents() {
         });
 
 
-    students = calculateGlobalRanking(
+    learningBasedStudents = calculateLearningRanking(
+        [...uniqueStudents.values()]
+    );
+
+    students = learningBasedStudents;
+
+    renderEverything();
+    renderRooms();
+}
+
+
+function calculateLearningRanking(list) {
+    return [...list]
+        .sort((a, b) => {
+            const aCompleted = a.status === "completed" ? 1 : 0;
+            const bCompleted = b.status === "completed" ? 1 : 0;
+
+            if (bCompleted !== aCompleted) {
+                return bCompleted - aCompleted;
+            }
+
+            const aAnswered =
+                a.statistics.correctAnswers +
+                a.statistics.wrongAnswers;
+            const bAnswered =
+                b.statistics.correctAnswers +
+                b.statistics.wrongAnswers;
+
+            if (bAnswered !== aAnswered) {
+                return bAnswered - aAnswered;
+            }
+
+            if (
+                b.statistics.correctAnswers !==
+                a.statistics.correctAnswers
+            ) {
+                return (
+                    b.statistics.correctAnswers -
+                    a.statistics.correctAnswers
+                );
+            }
+
+            return a.nickname.localeCompare(b.nickname);
+        })
+        .map((student, index) => ({
+            ...student,
+            rank: index + 1
+        }));
+}
+
+
+function rebuildAdminGeneralStudents() {
+    const uniqueStudents = new Map();
+
+    adminGeneralStudentGroups.forEach(roomStudents => {
+        roomStudents.forEach(student => {
+            uniqueStudents.set(student.uid, student);
+        });
+    });
+
+    generalKnowledgeStudents = calculateGlobalRanking(
         [...uniqueStudents.values()]
     );
 
     renderEverything();
-    renderRooms();
 }
 
 
@@ -979,6 +1194,12 @@ function stopAdminRoomUserListeners() {
 
     unsubscribeAdminRoomUsers = [];
     adminRoomStudentGroups.clear();
+
+    unsubscribeAdminGeneralUsers
+        .forEach(unsubscribe => unsubscribe());
+
+    unsubscribeAdminGeneralUsers = [];
+    adminGeneralStudentGroups.clear();
 }
 
 
@@ -1065,7 +1286,12 @@ function startStudentRoomListener(
                 );
             }
 
+            if (currentRoomMembership) {
+                upsertStudentRoomHistory(currentRoomMembership);
+            }
+
             renderCurrentStudent();
+            renderStudentRoomHistory();
         },
         error => {
             console.error(
@@ -1076,6 +1302,327 @@ function startStudentRoomListener(
             renderCurrentStudent();
         }
     );
+}
+
+
+function collectRoomKeysFromProfile(profile = {}) {
+    const keys = new Set();
+
+    const addRoomKey = value => {
+        const key = normalizeRoomKey(
+            typeof value === "object"
+                ? value?.roomKey || value?.key || ""
+                : value
+        );
+
+        if (key) {
+            keys.add(key);
+        }
+    };
+
+    addRoomKey(profile.roomKey);
+    addRoomKey(profile.learningRoomKey);
+
+    [
+        profile.roomHistory,
+        profile.learningRooms,
+        profile.joinedRooms
+    ].forEach(collection => {
+        if (Array.isArray(collection)) {
+            collection.forEach(addRoomKey);
+            return;
+        }
+
+        if (collection && typeof collection === "object") {
+            Object.entries(collection).forEach(([key, value]) => {
+                addRoomKey(key);
+                addRoomKey(value);
+            });
+        }
+    });
+
+    return keys;
+}
+
+
+async function findStudentMembership(roomKey) {
+    const directSnapshot = await get(
+        ref(database, `roomMembers/${roomKey}/${currentUser.uid}`)
+    );
+
+    if (directSnapshot.exists()) {
+        return normalizeRoomMember(
+            currentUser.uid,
+            roomKey,
+            directSnapshot.val()
+        );
+    }
+
+    if (!currentUser.studentNumber) {
+        return null;
+    }
+
+    const membershipSnapshot = await get(
+        query(
+            ref(database, `roomMembers/${roomKey}`),
+            orderByChild("studentNumber"),
+            equalTo(currentUser.studentNumber)
+        )
+    );
+
+    if (!membershipSnapshot.exists()) {
+        return null;
+    }
+
+    const firstMembership = Object.entries(
+        membershipSnapshot.val()
+    )[0];
+
+    return firstMembership
+        ? normalizeRoomMember(
+            firstMembership[0],
+            roomKey,
+            firstMembership[1]
+        )
+        : null;
+}
+
+
+async function loadStudentRoomHistory() {
+    if (
+        currentRole !== "student" ||
+        !currentUser?.uid
+    ) {
+        return;
+    }
+
+    const loadId = ++studentRoomHistoryLoadId;
+    const roomKeys = collectRoomKeysFromProfile(
+        currentUser.profile || {}
+    );
+    studentRoomHistoryDiscoveryLimited = false;
+
+    try {
+        const allRoomsSnapshot = await get(
+            ref(database, "roomKeys")
+        );
+
+        if (allRoomsSnapshot.exists()) {
+            Object.keys(allRoomsSnapshot.val() || {})
+                .forEach(key => roomKeys.add(normalizeRoomKey(key)));
+        }
+    }
+    catch {
+        /* Current Firebase rules may only allow direct room reads. */
+        studentRoomHistoryDiscoveryLimited = true;
+    }
+
+    const historyEntries = [];
+
+    await Promise.all(
+        [...roomKeys].filter(Boolean).map(async roomKey => {
+            try {
+                const [membership, roomSnapshot] = await Promise.all([
+                    findStudentMembership(roomKey),
+                    get(ref(database, `roomKeys/${roomKey}`))
+                ]);
+
+                if (!membership) {
+                    return;
+                }
+
+                const room = roomSnapshot.val() || {};
+                studentRoomDetails.set(roomKey, room);
+
+                historyEntries.push({
+                    ...membership,
+                    teacherName:
+                        membership.teacherName ||
+                        String(room.teacherName || ""),
+                    yearLevel:
+                        membership.yearLevel ||
+                        String(room.gradeLevel || ""),
+                    section:
+                        membership.section ||
+                        String(room.section || ""),
+                    yearSection: [
+                        membership.yearLevel || room.gradeLevel,
+                        membership.section || room.section
+                    ].filter(Boolean).join(" / ") || "N/A"
+                });
+            }
+            catch (error) {
+                console.warn(
+                    `Unable to inspect Learning-Based room ${roomKey}:`,
+                    error
+                );
+            }
+        })
+    );
+
+    if (loadId !== studentRoomHistoryLoadId) {
+        return;
+    }
+
+    studentRoomHistory = historyEntries.sort(
+        (a, b) => b.joinedAt - a.joinedAt
+    );
+
+    await Promise.all(
+        studentRoomHistory.map(async membership => {
+            try {
+                const membersSnapshot = await get(
+                    ref(
+                        database,
+                        `roomMembers/${membership.roomKey}`
+                    )
+                );
+
+                studentLearningLeaderboardsByRoom.set(
+                    membership.roomKey,
+                    calculateLearningRanking(
+                        Object.entries(membersSnapshot.val() || {})
+                            .map(([uid, member]) =>
+                                normalizeRoomMember(
+                                    uid,
+                                    membership.roomKey,
+                                    member
+                                )
+                            )
+                    )
+                );
+            }
+            catch {
+                studentLearningLeaderboardsByRoom.set(
+                    membership.roomKey,
+                    []
+                );
+            }
+        })
+    );
+
+    if (loadId !== studentRoomHistoryLoadId) {
+        return;
+    }
+
+    const currentProfileRoom = normalizeRoomKey(
+        currentUser.roomKey
+    );
+    const preferredRoom =
+        studentRoomHistory.some(
+            room => room.roomKey === currentProfileRoom
+        )
+            ? currentProfileRoom
+            : studentRoomHistory[0]?.roomKey || "";
+
+    if (preferredRoom) {
+        selectStudentRoom(preferredRoom);
+    }
+    else {
+        currentRoomMembership = null;
+        selectedStudentRoomKey = "";
+        studentLearningLeaderboard = [];
+        renderStudentRoomHistory();
+        renderCurrentStudent();
+        renderStudentLeaderboard();
+    }
+}
+
+
+function upsertStudentRoomHistory(membership) {
+    const index = studentRoomHistory.findIndex(
+        item => item.roomKey === membership.roomKey
+    );
+
+    const room = studentRoomDetails.get(membership.roomKey) || {};
+    const enriched = {
+        ...membership,
+        teacherName:
+            membership.teacherName ||
+            String(room.teacherName || ""),
+        yearSection: [
+            membership.yearLevel || room.gradeLevel,
+            membership.section || room.section
+        ].filter(Boolean).join(" / ") || membership.yearSection
+    };
+
+    if (index >= 0) {
+        studentRoomHistory[index] = enriched;
+    }
+    else {
+        studentRoomHistory.push(enriched);
+    }
+
+    studentRoomHistory.sort((a, b) => b.joinedAt - a.joinedAt);
+}
+
+
+async function selectStudentRoom(roomKey) {
+    const normalizedRoomKey = normalizeRoomKey(roomKey);
+
+    if (!normalizedRoomKey) {
+        return;
+    }
+
+    selectedStudentRoomKey = normalizedRoomKey;
+    currentRoomMembership =
+        studentRoomHistory.find(
+            item => item.roomKey === normalizedRoomKey
+        ) || null;
+
+    startStudentRoomListener(
+        normalizedRoomKey,
+        currentUser.studentNumber
+    );
+
+    renderStudentRoomHistory();
+    renderCurrentStudent();
+
+    try {
+        const [membersSnapshot, roomSnapshot] = await Promise.all([
+            get(ref(database, `roomMembers/${normalizedRoomKey}`)),
+            get(ref(database, `roomKeys/${normalizedRoomKey}`))
+        ]);
+
+        const room = roomSnapshot.val() || {};
+        studentRoomDetails.set(normalizedRoomKey, room);
+
+        studentLearningLeaderboard = calculateLearningRanking(
+            Object.entries(membersSnapshot.val() || {})
+                .map(([uid, member]) => ({
+                    ...normalizeRoomMember(
+                        uid,
+                        normalizedRoomKey,
+                        member
+                    ),
+                    teacherName: String(
+                        member?.teacherName ||
+                        room.teacherName ||
+                        ""
+                    )
+                }))
+        );
+
+        studentLearningLeaderboardsByRoom.set(
+            normalizedRoomKey,
+            studentLearningLeaderboard
+        );
+    }
+    catch (error) {
+        console.error(
+            "Unable to load the Learning-Based room leaderboard:",
+            error
+        );
+        studentLearningLeaderboard = [];
+        studentLearningLeaderboardsByRoom.set(
+            normalizedRoomKey,
+            []
+        );
+    }
+
+    populateAllFilters();
+    renderStudentRoomHistory();
+    renderStudentLeaderboard();
 }
 
 
@@ -1094,6 +1641,13 @@ function stopFirebaseListeners() {
 
 
     currentRoomMembership = null;
+    studentRoomHistory = [];
+    selectedStudentRoomKey = "";
+    studentLearningLeaderboard = [];
+    studentLearningLeaderboardsByRoom.clear();
+    studentRoomDetails.clear();
+    studentRoomHistoryLoadId += 1;
+    studentRoomHistoryDiscoveryLimited = false;
 
 
     if (unsubscribeQuestions) {
@@ -1119,6 +1673,8 @@ function renderEverything() {
     renderStudentLeaderboard();
 
     renderCurrentStudent();
+
+    renderStudentRoomHistory();
 }
 
 
@@ -1145,6 +1701,8 @@ async function logoutToLogin() {
     currentUser = null;
     currentRole = null;
     students = [];
+    generalKnowledgeStudents = [];
+    learningBasedStudents = [];
     questions = [];
     clearActiveRoomKey();
 
@@ -1155,10 +1713,6 @@ async function logoutToLogin() {
 
     document
         .getElementById("loginPassword")
-        .value = "";
-
-    document
-        .getElementById("loginRole")
         .value = "";
 
     document
@@ -1560,6 +2114,20 @@ function setActiveRoomKey(
     }
 
 
+    if (
+        activeRoomKey &&
+        activeRoomKey !== normalizedRoomKey &&
+        (
+            pendingCsvQuestions.length ||
+            pendingCsvErrors.length
+        )
+    ) {
+        clearCsvImport(
+            "Room changed. Choose the CSV file again for the new room."
+        );
+    }
+
+
     activeRoomKey = normalizedRoomKey;
 
     document
@@ -1815,6 +2383,11 @@ async function activateRoomKeyFromInput() {
 function clearActiveRoomKey() {
     activeRoomKey = "";
 
+
+    clearCsvImport(
+        "Select a room before importing a CSV file."
+    );
+
     document
         .getElementById("questionRoomKey")
         .value = "";
@@ -2023,6 +2596,575 @@ function validateQuestion(question) {
 
 
     return "";
+}
+
+
+/* ==================================================
+   CSV QUESTION IMPORT
+
+   Expected columns:
+   question, optionA, optionB, optionC, optionD,
+   correctAnswer
+================================================== */
+
+function setCsvImportMessage(message, isError = false) {
+    const messageElement = document.getElementById(
+        "csvImportMessage"
+    );
+
+
+    messageElement.textContent = message;
+    messageElement.classList.toggle("error", isError);
+}
+
+
+function parseCsvRows(csvText) {
+    const text = String(csvText || "")
+        .replace(/^\uFEFF/, "");
+    const rows = [];
+    let row = [];
+    let field = "";
+    let insideQuotes = false;
+
+
+    for (let index = 0; index < text.length; index += 1) {
+        const character = text[index];
+
+
+        if (insideQuotes) {
+            if (character === '"') {
+                if (text[index + 1] === '"') {
+                    field += '"';
+                    index += 1;
+                }
+
+                else {
+                    insideQuotes = false;
+                }
+            }
+
+            else {
+                field += character;
+            }
+
+
+            continue;
+        }
+
+
+        if (character === '"') {
+            insideQuotes = true;
+        }
+
+        else if (character === ",") {
+            row.push(field);
+            field = "";
+        }
+
+        else if (character === "\n") {
+            row.push(field.replace(/\r$/, ""));
+
+
+            if (row.some(value => String(value).trim())) {
+                rows.push(row);
+            }
+
+
+            row = [];
+            field = "";
+        }
+
+        else {
+            field += character;
+        }
+    }
+
+
+    if (insideQuotes) {
+        throw new Error(
+            "The CSV contains an unfinished quoted value."
+        );
+    }
+
+
+    row.push(field.replace(/\r$/, ""));
+
+
+    if (row.some(value => String(value).trim())) {
+        rows.push(row);
+    }
+
+
+    return rows;
+}
+
+
+function normalizeCsvHeader(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+}
+
+
+function getCsvColumnIndexes(headerRow) {
+    const normalizedHeaders = headerRow.map(
+        normalizeCsvHeader
+    );
+    const aliases = {
+        question: ["question", "text", "questiontext"],
+        optionA: ["optiona", "a", "answera"],
+        optionB: ["optionb", "b", "answerb"],
+        optionC: ["optionc", "c", "answerc"],
+        optionD: ["optiond", "d", "answerd"],
+        correctAnswer: [
+            "correctanswer",
+            "correct",
+            "answer"
+        ]
+    };
+    const indexes = {};
+
+
+    Object.entries(aliases).forEach(
+        ([columnName, acceptedHeaders]) => {
+            indexes[columnName] =
+                normalizedHeaders.findIndex(header =>
+                    acceptedHeaders.includes(header)
+                );
+        }
+    );
+
+
+    return indexes;
+}
+
+
+function validateCsvRows(rows) {
+    if (rows.length < 2) {
+        return {
+            questions: [],
+            errors: [
+                "The CSV must contain a header and at least one question."
+            ]
+        };
+    }
+
+
+    const indexes = getCsvColumnIndexes(rows[0]);
+    const missingColumns = Object.entries(indexes)
+        .filter(([, index]) => index < 0)
+        .map(([columnName]) => columnName);
+
+
+    if (missingColumns.length) {
+        return {
+            questions: [],
+            errors: [
+                `Missing columns: ${missingColumns.join(", ")}.`
+            ]
+        };
+    }
+
+
+    const dataRows = rows.slice(1).filter(row =>
+        row.some(value => String(value).trim())
+    );
+
+
+    if (!dataRows.length) {
+        return {
+            questions: [],
+            errors: [
+                "The CSV does not contain any question rows."
+            ]
+        };
+    }
+
+
+    if (dataRows.length > 200) {
+        return {
+            questions: [],
+            errors: [
+                "A single CSV file can contain a maximum of 200 questions."
+            ]
+        };
+    }
+
+
+    const parsedQuestions = [];
+    const errors = [];
+    const fileQuestions = new Set();
+    const savedQuestions = new Set(
+        questions
+            .filter(question =>
+                question.roomKey === activeRoomKey
+            )
+            .map(question =>
+                question.text.trim().toLowerCase()
+            )
+    );
+
+
+    dataRows.forEach((row, rowIndex) => {
+        const csvRowNumber = rowIndex + 2;
+        const text = String(
+            row[indexes.question] || ""
+        ).trim();
+        const options = {
+            A: String(row[indexes.optionA] || "").trim(),
+            B: String(row[indexes.optionB] || "").trim(),
+            C: String(row[indexes.optionC] || "").trim(),
+            D: String(row[indexes.optionD] || "").trim()
+        };
+        const correctAnswer = String(
+            row[indexes.correctAnswer] || ""
+        )
+            .trim()
+            .toUpperCase()
+            .replace(/^OPTION\s*/, "");
+        const rowErrors = [];
+
+
+        if (!text) {
+            rowErrors.push("question is empty");
+        }
+
+        else if (text.length > 500) {
+            rowErrors.push("question exceeds 500 characters");
+        }
+
+
+        Object.entries(options).forEach(([letter, option]) => {
+            if (!option) {
+                rowErrors.push(`option ${letter} is empty`);
+            }
+
+            else if (option.length > 200) {
+                rowErrors.push(
+                    `option ${letter} exceeds 200 characters`
+                );
+            }
+        });
+
+
+        if (!["A", "B", "C", "D"].includes(correctAnswer)) {
+            rowErrors.push(
+                "correctAnswer must be A, B, C or D"
+            );
+        }
+
+
+        const questionKey = text.toLowerCase();
+
+
+        if (questionKey && fileQuestions.has(questionKey)) {
+            rowErrors.push("duplicate question in this CSV");
+        }
+
+
+        if (questionKey && savedQuestions.has(questionKey)) {
+            rowErrors.push(
+                `question already exists in room ${activeRoomKey}`
+            );
+        }
+
+
+        if (rowErrors.length) {
+            errors.push(
+                `Row ${csvRowNumber}: ${rowErrors.join("; ")}.`
+            );
+            return;
+        }
+
+
+        fileQuestions.add(questionKey);
+        parsedQuestions.push({
+            text,
+            options,
+            correctAnswer
+        });
+    });
+
+
+    return {
+        questions: parsedQuestions,
+        errors
+    };
+}
+
+
+function renderCsvPreview() {
+    const wrapper = document.getElementById(
+        "csvPreviewWrapper"
+    );
+    const summary = document.getElementById(
+        "csvPreviewSummary"
+    );
+    const tableBody = document.getElementById(
+        "csvPreviewTable"
+    );
+    const importButton = document.getElementById(
+        "importCsvButton"
+    );
+
+
+    if (
+        !pendingCsvQuestions.length &&
+        !pendingCsvErrors.length
+    ) {
+        wrapper.classList.add("hidden");
+        tableBody.innerHTML = "";
+        importButton.disabled = true;
+        return;
+    }
+
+
+    wrapper.classList.remove("hidden");
+    summary.textContent = pendingCsvErrors.length
+        ? `${pendingCsvQuestions.length} valid · ${pendingCsvErrors.length} error(s)`
+        : `${pendingCsvQuestions.length} question(s) ready for room ${pendingCsvRoomKey}`;
+
+
+    const previewRows = pendingCsvQuestions
+        .slice(0, 10)
+        .map((question, index) => `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${escapeHTML(question.text)}</td>
+                <td>${escapeHTML(question.correctAnswer)}</td>
+            </tr>
+        `);
+    const errorRows = pendingCsvErrors
+        .slice(0, 5)
+        .map(error => `
+            <tr class="csv-row-error">
+                <td>!</td>
+                <td colspan="2">${escapeHTML(error)}</td>
+            </tr>
+        `);
+
+
+    tableBody.innerHTML = [
+        ...previewRows,
+        ...errorRows
+    ].join("");
+
+
+    if (pendingCsvQuestions.length > 10) {
+        tableBody.insertAdjacentHTML(
+            "beforeend",
+            `<tr><td colspan="3">…and ${pendingCsvQuestions.length - 10} more question(s)</td></tr>`
+        );
+    }
+
+
+    importButton.disabled = Boolean(
+        !pendingCsvQuestions.length ||
+        pendingCsvErrors.length ||
+        pendingCsvRoomKey !== activeRoomKey
+    );
+}
+
+
+function clearCsvImport(message = "") {
+    pendingCsvQuestions = [];
+    pendingCsvErrors = [];
+    pendingCsvRoomKey = "";
+
+
+    const fileInput = document.getElementById(
+        "csvFileInput"
+    );
+
+
+    if (fileInput) {
+        fileInput.value = "";
+    }
+
+
+    renderCsvPreview();
+
+
+    if (message) {
+        setCsvImportMessage(message);
+    }
+}
+
+
+async function handleCsvFile(file) {
+    clearCsvImport();
+
+
+    if (!activeRoomKey) {
+        setCsvImportMessage(
+            "Select an active room before choosing a CSV file.",
+            true
+        );
+        return;
+    }
+
+
+    if (!file) {
+        return;
+    }
+
+
+    if (
+        !file.name.toLowerCase().endsWith(".csv") &&
+        file.type !== "text/csv"
+    ) {
+        setCsvImportMessage(
+            "Choose a file with the .csv extension.",
+            true
+        );
+        return;
+    }
+
+
+    if (file.size > 1024 * 1024) {
+        setCsvImportMessage(
+            "The CSV is larger than the 1 MB limit.",
+            true
+        );
+        return;
+    }
+
+
+    try {
+        const rows = parseCsvRows(await file.text());
+        const result = validateCsvRows(rows);
+
+
+        pendingCsvQuestions = result.questions;
+        pendingCsvErrors = result.errors;
+        pendingCsvRoomKey = activeRoomKey;
+
+
+        renderCsvPreview();
+
+
+        if (pendingCsvErrors.length) {
+            setCsvImportMessage(
+                "Fix the listed CSV errors before importing. No questions have been uploaded.",
+                true
+            );
+        }
+
+        else {
+            setCsvImportMessage(
+                `${pendingCsvQuestions.length} question(s) are ready. Review the preview, then select Import Questions.`
+            );
+        }
+    }
+
+    catch (error) {
+        console.error("CSV parsing failed:", error);
+        setCsvImportMessage(
+            error.message || "Unable to read this CSV file.",
+            true
+        );
+    }
+}
+
+
+async function importCsvQuestions() {
+    if (!hasAdminQuestionAccess()) {
+        setCsvImportMessage(
+            "Teacher / Admin access is required.",
+            true
+        );
+        return;
+    }
+
+
+    if (
+        !pendingCsvQuestions.length ||
+        pendingCsvErrors.length ||
+        pendingCsvRoomKey !== activeRoomKey
+    ) {
+        setCsvImportMessage(
+            "Choose and validate a CSV file for the active room first.",
+            true
+        );
+        return;
+    }
+
+
+    const importButton = document.getElementById(
+        "importCsvButton"
+    );
+    const questionCount = pendingCsvQuestions.length;
+
+
+    importButton.disabled = true;
+    importButton.textContent = "Importing...";
+
+
+    try {
+        const updates = {};
+
+
+        pendingCsvQuestions.forEach(question => {
+            const questionReference = push(
+                ref(database, "questions")
+            );
+
+
+            updates[`questions/${questionReference.key}`] = {
+                ...question,
+                roomKey: activeRoomKey,
+                createdAt: serverTimestamp(),
+                createdBy: currentUser.uid,
+                updatedAt: serverTimestamp(),
+                updatedBy: currentUser.uid
+            };
+        });
+
+
+        await update(ref(database), updates);
+
+
+        clearCsvImport(
+            `${questionCount} question(s) were imported successfully into room ${activeRoomKey}.`
+        );
+    }
+
+    catch (error) {
+        console.error("Firebase CSV import failed:", error);
+        setCsvImportMessage(
+            "No questions were imported. Check your connection and Firebase question rules.",
+            true
+        );
+    }
+
+    finally {
+        importButton.textContent = "Import Questions";
+        renderCsvPreview();
+    }
+}
+
+
+function downloadCsvTemplate() {
+    const template = [
+        "question,optionA,optionB,optionC,optionD,correctAnswer",
+        '"What is 2 + 2?","3","4","5","6","B"',
+        '"Which planet is known as the Red Planet?","Earth","Mars","Jupiter","Venus","B"'
+    ].join("\r\n");
+    const blob = new Blob(
+        [template],
+        { type: "text/csv;charset=utf-8" }
+    );
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+
+    link.href = downloadUrl;
+    link.download = "tuklask-question-template.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(downloadUrl);
 }
 
 
@@ -2726,6 +3868,78 @@ document
     );
 
 
+const csvDropZone = document.getElementById(
+    "csvDropZone"
+);
+const csvFileInput = document.getElementById(
+    "csvFileInput"
+);
+
+
+csvDropZone.addEventListener("click", event => {
+    if (event.target === csvFileInput) {
+        return;
+    }
+
+
+    csvFileInput.click();
+});
+
+
+csvDropZone.addEventListener("keydown", event => {
+    if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        csvFileInput.click();
+    }
+});
+
+
+["dragenter", "dragover"].forEach(eventName => {
+    csvDropZone.addEventListener(eventName, event => {
+        event.preventDefault();
+        csvDropZone.classList.add("drag-over");
+    });
+});
+
+
+["dragleave", "drop"].forEach(eventName => {
+    csvDropZone.addEventListener(eventName, event => {
+        event.preventDefault();
+        csvDropZone.classList.remove("drag-over");
+    });
+});
+
+
+csvDropZone.addEventListener("drop", event => {
+    handleCsvFile(event.dataTransfer?.files?.[0]);
+});
+
+
+csvFileInput.addEventListener("change", event => {
+    handleCsvFile(event.target.files?.[0]);
+});
+
+
+document
+    .getElementById("downloadCsvTemplateButton")
+    .addEventListener("click", downloadCsvTemplate);
+
+
+document
+    .getElementById("clearCsvButton")
+    .addEventListener(
+        "click",
+        () => clearCsvImport(
+            "CSV selection cleared."
+        )
+    );
+
+
+document
+    .getElementById("importCsvButton")
+    .addEventListener("click", importCsvQuestions);
+
+
 /* ==================================================
    STUDENT NAVIGATION
 ================================================== */
@@ -2850,89 +4064,64 @@ function closeAllSidebars() {
 ================================================== */
 
 function renderAdminDashboard() {
-    const total =
-        students.length;
+    const generalTotal = generalKnowledgeStudents.length;
+    const generalStages = generalKnowledgeStudents.reduce(
+        (sum, student) => sum + getStagesCompleted(student),
+        0
+    );
+    const generalLevels = generalKnowledgeStudents.reduce(
+        (sum, student) => sum + student.progress.level,
+        0
+    );
+    const generalExp = generalKnowledgeStudents.reduce(
+        (sum, student) => sum + student.progress.exp,
+        0
+    );
+    const generalAccuracy = generalKnowledgeStudents.reduce(
+        (sum, student) => sum + calculateAccuracy(student),
+        0
+    );
 
+    const learningTotal = learningBasedStudents.length;
+    const learningInProgress = learningBasedStudents.filter(
+        student => student.status !== "completed"
+    ).length;
+    const learningCompleted = learningBasedStudents.filter(
+        student => student.status === "completed"
+    ).length;
+    const learningAnswered = learningBasedStudents.reduce(
+        (sum, student) =>
+            sum +
+            student.statistics.correctAnswers +
+            student.statistics.wrongAnswers,
+        0
+    );
 
-    const active =
-        students.filter(student => {
-            if (student.status) {
-                return student.status === "in_progress";
-            }
+    const setText = (id, value) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.textContent = value;
+        }
+    };
 
-
-            return (
-                student.progress.exp > 0 ||
-                student.progress.currentStage > 0 ||
-                student.statistics.correctAnswers > 0 ||
-                student.statistics.wrongAnswers > 0
-            );
-        }).length;
-
-
-    const totalStages =
-        students.reduce(
-            (sum, student) =>
-                sum +
-                getStagesCompleted(student),
-            0
-        );
-
-
-    const totalLevel =
-        students.reduce(
-            (sum, student) =>
-                sum +
-                student.progress.level,
-            0
-        );
-
-
-    const totalExp =
-        students.reduce(
-            (sum, student) =>
-                sum +
-                student.progress.exp,
-            0
-        );
-
-
-    const averageLevel =
-        total > 0
-            ? totalLevel / total
-            : 0;
-
-
-    const averageExp =
-        total > 0
-            ? totalExp / total
-            : 0;
-
-
-    document
-        .getElementById("totalStudents")
-        .textContent =
-            total;
-
-    document
-        .getElementById("activeStudents")
-        .textContent =
-            active;
-
-    document
-        .getElementById("totalStagesCompleted")
-        .textContent =
-            totalStages;
-
-    document
-        .getElementById("averageLevel")
-        .textContent =
-            averageLevel.toFixed(1);
-
-    document
-        .getElementById("averageExp")
-        .textContent =
-            Math.round(averageExp);
+    setText("generalTotalStudents", generalTotal);
+    setText("generalStagesCompleted", generalStages);
+    setText(
+        "generalAverageLevel",
+        generalTotal ? (generalLevels / generalTotal).toFixed(1) : "0.0"
+    );
+    setText(
+        "generalAverageExp",
+        generalTotal ? Math.round(generalExp / generalTotal) : 0
+    );
+    setText(
+        "generalAverageAccuracy",
+        `${generalTotal ? Math.round(generalAccuracy / generalTotal) : 0}%`
+    );
+    setText("learningTotalStudents", learningTotal);
+    setText("learningInProgress", learningInProgress);
+    setText("learningCompleted", learningCompleted);
+    setText("learningAnswered", learningAnswered);
 
 
     renderTopPlayers();
@@ -2953,7 +4142,7 @@ function renderTopPlayers() {
     container.innerHTML = "";
 
 
-    if (students.length === 0) {
+    if (generalKnowledgeStudents.length === 0) {
         container.innerHTML =
             "<p>No students are assigned to your rooms yet.</p>";
 
@@ -2961,7 +4150,7 @@ function renderTopPlayers() {
     }
 
 
-    students
+    generalKnowledgeStudents
         .slice(0, 5)
         .forEach(student => {
             const row =
@@ -3008,84 +4197,97 @@ function renderTopPlayers() {
 ================================================== */
 
 function populateAllFilters() {
-    const levels = [
+    const learningLevels = [
         ...new Set(
-            students.map(
+            learningBasedStudents.map(
                 student =>
                     student.progress.level
             )
         )
     ].sort((a, b) => a - b);
 
-
-    const sections = [
+    const learningSections = [
         ...new Set(
-            students.map(
+            learningBasedStudents.map(
                 student =>
                     student.yearSection
             )
         )
     ].sort();
 
-
-    const roomKeys = [
+    const generalLevels = [
         ...new Set(
-            students
+            generalKnowledgeStudents.map(
+                student => student.progress.level
+            )
+        )
+    ].sort((a, b) => a - b);
+
+    const generalSections = [
+        ...new Set(
+            generalKnowledgeStudents.map(
+                student => student.yearSection
+            )
+        )
+    ].sort();
+
+    const learningRoomKeys = [
+        ...new Set(
+            learningBasedStudents
                 .map(student => student.roomKey)
                 .filter(Boolean)
         )
     ].sort();
 
-
     populateSelect(
         "managementLevel",
-        levels,
+        learningLevels,
         "All Levels",
         value => `Level ${value}`
     );
-
-
-    populateSelect(
-        "adminLeaderboardLevel",
-        levels,
-        "All Levels",
-        value => `Level ${value}`
-    );
-
 
     populateSelect(
         "studentLeaderboardLevel",
-        levels,
+        generalLevels,
         "All Levels",
         value => `Level ${value}`
     );
 
-
     populateSelect(
         "managementSection",
-        sections,
+        learningSections,
         "All Sections"
     );
-
 
     populateSelect(
         "adminLeaderboardSection",
-        sections,
+        learningSections,
         "All Sections"
     );
-
 
     populateSelect(
         "adminLeaderboardRoom",
-        roomKeys,
+        learningRoomKeys,
         "All My Rooms"
     );
 
-
     populateSelect(
         "studentLeaderboardSection",
-        sections,
+        generalSections,
         "All Sections"
+    );
+
+    populateSelect(
+        "studentLeaderboardRoom",
+        studentRoomHistory.map(room => room.roomKey),
+        "All Joined Rooms",
+        value => {
+            const membership = studentRoomHistory.find(
+                room => room.roomKey === value
+            );
+            const teacher = membership?.teacherName;
+            return teacher ? `${value} — ${teacher}` : value;
+        }
     );
 }
 
@@ -3213,7 +4415,7 @@ function renderStudentManagement() {
 
 
     const filtered =
-        students.filter(student => {
+        learningBasedStudents.filter(student => {
             const matchesSearch =
                 student.nickname
                     .toLowerCase()
@@ -3361,7 +4563,7 @@ function renderStudentManagement() {
 
 function showStudentDetails(uid) {
     const student =
-        students.find(
+        learningBasedStudents.find(
             student =>
                 (student.membershipId || student.uid) === uid
         );
@@ -3692,9 +4894,185 @@ function getFilteredLeaderboard(role) {
    ADMIN LEADERBOARD
 ================================================== */
 
+function getAdminLearningLeaderboard() {
+    const search = document
+        .getElementById("adminLeaderboardSearch")
+        .value.trim().toLowerCase();
+    const status = document
+        .getElementById("adminLeaderboardLevel")
+        .value;
+    const section = document
+        .getElementById("adminLeaderboardSection")
+        .value;
+    const roomKey = document
+        .getElementById("adminLeaderboardRoom")
+        .value;
+    const sort = document
+        .getElementById("adminLeaderboardSort")
+        .value;
+    const top = document
+        .getElementById("adminLeaderboardTop")
+        .value;
+
+    let result = learningBasedStudents.filter(student => {
+        const searchable = [
+            student.fullName,
+            student.nickname,
+            student.studentNumber
+        ].join(" ").toLowerCase();
+
+        return (
+            searchable.includes(search) &&
+            (status === "all" || student.status === status) &&
+            (section === "all" || student.yearSection === section) &&
+            (roomKey === "all" || student.roomKey === roomKey)
+        );
+    });
+
+    result = [...result];
+
+    switch (sort) {
+        case "answeredHigh":
+            result.sort((a, b) =>
+                (b.statistics.correctAnswers + b.statistics.wrongAnswers) -
+                (a.statistics.correctAnswers + a.statistics.wrongAnswers)
+            );
+            break;
+        case "correctHigh":
+            result.sort((a, b) =>
+                b.statistics.correctAnswers - a.statistics.correctAnswers
+            );
+            break;
+        case "completedFirst":
+            result = calculateLearningRanking(result);
+            break;
+        case "nameAZ":
+            result.sort((a, b) =>
+                (a.fullName || a.nickname).localeCompare(
+                    b.fullName || b.nickname
+                )
+            );
+            break;
+        case "nameZA":
+            result.sort((a, b) =>
+                (b.fullName || b.nickname).localeCompare(
+                    a.fullName || a.nickname
+                )
+            );
+            break;
+        default:
+            result.sort((a, b) => a.rank - b.rank);
+    }
+
+    result = result.map((student, index) => ({
+        ...student,
+        displayRank: index + 1
+    }));
+
+    return top === "all"
+        ? result
+        : result.slice(0, Number(top));
+}
+
+
+function getStudentLeaderboardMode() {
+    return document.getElementById("studentLeaderboardMode")?.value ||
+        "general";
+}
+
+
+function getStudentGeneralLeaderboard() {
+    const search = document
+        .getElementById("studentLeaderboardSearch")
+        .value.trim().toLowerCase();
+    const level = document
+        .getElementById("studentLeaderboardLevel")
+        .value;
+    const section = document
+        .getElementById("studentLeaderboardSection")
+        .value;
+    const sort = document
+        .getElementById("studentLeaderboardSort")
+        .value;
+    const top = document
+        .getElementById("studentLeaderboardTop")
+        .value;
+
+    let result = generalKnowledgeStudents.filter(student =>
+        [student.nickname, student.studentNumber]
+            .join(" ").toLowerCase().includes(search) &&
+        (level === "all" || String(student.progress.level) === level) &&
+        (section === "all" || student.yearSection === section)
+    );
+
+    result = [...result];
+
+    switch (sort) {
+        case "expHigh":
+            result.sort((a, b) => b.progress.exp - a.progress.exp);
+            break;
+        case "expLow":
+            result.sort((a, b) => a.progress.exp - b.progress.exp);
+            break;
+        case "levelHigh":
+            result.sort((a, b) => b.progress.level - a.progress.level);
+            break;
+        case "levelLow":
+            result.sort((a, b) => a.progress.level - b.progress.level);
+            break;
+        case "nameAZ":
+            result.sort((a, b) => a.nickname.localeCompare(b.nickname));
+            break;
+        case "nameZA":
+            result.sort((a, b) => b.nickname.localeCompare(a.nickname));
+            break;
+        default:
+            result.sort((a, b) => a.rank - b.rank);
+    }
+
+    return top === "all"
+        ? result
+        : result.slice(0, Number(top));
+}
+
+
+function getStudentLearningLeaderboard() {
+    const search = document
+        .getElementById("studentLeaderboardSearch")
+        .value.trim().toLowerCase();
+    const selectedRoom = document
+        .getElementById("studentLeaderboardRoom")
+        .value;
+    const top = document
+        .getElementById("studentLeaderboardTop")
+        .value;
+
+    const lists = selectedRoom === "all"
+        ? [...studentLearningLeaderboardsByRoom.values()]
+        : [studentLearningLeaderboardsByRoom.get(selectedRoom) || []];
+
+    const unique = new Map();
+    lists.flat().forEach(student => {
+        unique.set(student.membershipId, student);
+    });
+
+    let result = calculateLearningRanking(
+        [...unique.values()].filter(student =>
+            [student.fullName, student.nickname]
+                .join(" ").toLowerCase().includes(search)
+        )
+    );
+
+    if (top !== "all") {
+        result = result.slice(0, Number(top));
+    }
+
+    return result;
+}
+
 function renderAdminLeaderboard() {
     const list =
-        getFilteredLeaderboard("admin");
+        getAdminLearningLeaderboard();
 
     const tbody =
         document.getElementById(
@@ -3725,12 +5103,12 @@ function renderAdminLeaderboard() {
 
         row.innerHTML = `
             <td class="rank-cell">
-                #${student.rank}
+                #${student.displayRank || student.rank}
             </td>
 
             <td class="nickname-cell">
                 ${escapeHTML(
-                    student.nickname
+                    student.fullName || "Not provided"
                 )}
             </td>
 
@@ -3741,31 +5119,29 @@ function renderAdminLeaderboard() {
             </td>
 
             <td>
+                ${escapeHTML(student.nickname)}
+            </td>
+
+            <td>
+                ${escapeHTML(student.yearSection)}
+            </td>
+
+            <td>
                 <span class="room-key-badge">
-                    ${escapeHTML(
-                        student.roomKey
-                    )}
+                    ${escapeHTML(student.roomKey)}
                 </span>
             </td>
 
             <td>
-                ${escapeHTML(
-                    student.yearSection
-                )}
-            </td>
-
-            <td class="level-cell">
-                ${student.progress.level}
-            </td>
-
-            <td class="exp-cell">
-                ${formatNumber(
-                    student.progress.exp
-                )}
-            </td>
-
-            <td>
-                ${student.progress.currentStage}
+                <span class="status-badge ${
+                    student.status === "completed"
+                        ? "status-completed"
+                        : "status-progress"
+                }">
+                    ${student.status === "completed"
+                        ? "Completed"
+                        : "In Progress"}
+                </span>
             </td>
 
             <td class="correct-cell">
@@ -3774,6 +5150,13 @@ function renderAdminLeaderboard() {
 
             <td class="wrong-cell">
                 ${student.statistics.wrongAnswers}
+            </td>
+
+            <td>
+                ${
+                    student.statistics.correctAnswers +
+                    student.statistics.wrongAnswers
+                }
             </td>
         `;
 
@@ -3800,13 +5183,59 @@ function renderAdminLeaderboard() {
 ================================================== */
 
 function renderStudentLeaderboard() {
-    const list =
-        getFilteredLeaderboard("student");
+    const mode = getStudentLeaderboardMode();
+    const list = mode === "learning"
+        ? getStudentLearningLeaderboard()
+        : getStudentGeneralLeaderboard();
 
     const tbody =
         document.getElementById(
             "studentLeaderboardTable"
         );
+
+    const head = document.getElementById(
+        "studentLeaderboardHead"
+    );
+
+    const roomField = document.getElementById(
+        "studentLeaderboardRoomField"
+    );
+
+    if (roomField) {
+        roomField.classList.toggle("hidden", mode !== "learning");
+    }
+
+    [
+        "studentLeaderboardLevelField",
+        "studentLeaderboardSectionField",
+        "studentLeaderboardSortField"
+    ].forEach(id => {
+        document
+            .getElementById(id)
+            ?.classList.toggle("hidden", mode === "learning");
+    });
+
+    if (head) {
+        head.innerHTML = mode === "learning"
+            ? `
+                <tr>
+                    <th>Rank</th>
+                    <th>Player</th>
+                    <th>Section / Year</th>
+                    <th>Status</th>
+                </tr>
+            `
+            : `
+                <tr>
+                    <th>Rank</th>
+                    <th>Player</th>
+                    <th>Section</th>
+                    <th>Level</th>
+                    <th>EXP</th>
+                    <th>Stage</th>
+                </tr>
+            `;
+    }
 
 
     tbody.innerHTML = "";
@@ -3815,7 +5244,7 @@ function renderStudentLeaderboard() {
     if (list.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6">
+                <td colspan="${mode === "learning" ? 4 : 6}">
                     No players found.
                 </td>
             </tr>
@@ -3840,37 +5269,35 @@ function renderStudentLeaderboard() {
         }
 
 
-        row.innerHTML = `
-            <td class="rank-cell">
-                #${student.rank}
-            </td>
-
-            <td class="nickname-cell">
-                ${escapeHTML(
-                    student.nickname
-                )}
-            </td>
-
-            <td>
-                ${escapeHTML(
-                    student.yearSection
-                )}
-            </td>
-
-            <td class="level-cell">
-                ${student.progress.level}
-            </td>
-
-            <td class="exp-cell">
-                ${formatNumber(
-                    student.progress.exp
-                )}
-            </td>
-
-            <td>
-                ${student.progress.currentStage}
-            </td>
-        `;
+        row.innerHTML = mode === "learning"
+            ? `
+                <td class="rank-cell">#${student.rank}</td>
+                <td class="nickname-cell">
+                    ${escapeHTML(student.nickname)}
+                </td>
+                <td>${escapeHTML(student.yearSection)}</td>
+                <td>
+                    <span class="status-badge ${
+                        student.status === "completed"
+                            ? "status-completed"
+                            : "status-progress"
+                    }">
+                        ${student.status === "completed"
+                            ? "Completed"
+                            : "In Progress"}
+                    </span>
+                </td>
+            `
+            : `
+                <td class="rank-cell">#${student.rank}</td>
+                <td class="nickname-cell">
+                    ${escapeHTML(student.nickname)}
+                </td>
+                <td>${escapeHTML(student.yearSection)}</td>
+                <td class="level-cell">${student.progress.level}</td>
+                <td class="exp-cell">${formatNumber(student.progress.exp)}</td>
+                <td>${student.progress.currentStage}</td>
+            `;
 
 
         tbody.appendChild(row);
@@ -3898,6 +5325,13 @@ function renderStudentLeaderboard() {
 
     if (role === "admin") {
         ids.push("adminLeaderboardRoom");
+    }
+
+    else {
+        ids.push(
+            "studentLeaderboardMode",
+            "studentLeaderboardRoom"
+        );
     }
 
 
@@ -3971,6 +5405,16 @@ function renderStudentLeaderboard() {
                         .value = "all";
                 }
 
+                else {
+                    document
+                        .getElementById("studentLeaderboardMode")
+                        .value = "general";
+
+                    document
+                        .getElementById("studentLeaderboardRoom")
+                        .value = "all";
+                }
+
 
                 document
                     .getElementById(
@@ -4003,6 +5447,74 @@ function renderStudentLeaderboard() {
    CURRENT STUDENT
 ================================================== */
 
+function renderStudentRoomHistory() {
+    const container = document.getElementById(
+        "studentRoomHistoryList"
+    );
+    const message = document.getElementById(
+        "studentRoomHistoryMessage"
+    );
+
+    if (!container || !message) {
+        return;
+    }
+
+    container.innerHTML = "";
+    message.textContent = "";
+
+    if (currentRole !== "student") {
+        return;
+    }
+
+    if (!studentRoomHistory.length) {
+        message.textContent = studentRoomHistoryDiscoveryLimited
+            ? "Room history is unavailable until Firebase allows signed-in users to list room keys."
+            : "No Learning-Based room history was found for this account.";
+        return;
+    }
+
+    if (studentRoomHistoryDiscoveryLimited) {
+        message.textContent =
+            "Showing known rooms only. Allow signed-in users to list room keys to display complete history.";
+    }
+
+    studentRoomHistory.forEach(membership => {
+        const button = document.createElement("button");
+        const isCurrent =
+            membership.roomKey === normalizeRoomKey(currentUser.roomKey);
+        const isSelected =
+            membership.roomKey === selectedStudentRoomKey;
+
+        button.type = "button";
+        button.className = `room-history-item${
+            isSelected ? " active" : ""
+        }`;
+        button.dataset.roomKey = membership.roomKey;
+        button.innerHTML = `
+            <span class="room-history-main">
+                <strong>${escapeHTML(membership.roomKey)}</strong>
+                <small>
+                    ${escapeHTML(membership.teacherName || "Teacher not listed")}
+                    · ${escapeHTML(membership.yearSection)}
+                </small>
+            </span>
+            <span class="room-history-meta">
+                ${isCurrent ? "Current · " : ""}${
+                    membership.status === "completed"
+                        ? "Completed"
+                        : "In Progress"
+                }
+            </span>
+        `;
+
+        button.addEventListener("click", () => {
+            selectStudentRoom(membership.roomKey);
+        });
+
+        container.appendChild(button);
+    });
+}
+
 function renderCurrentStudent() {
     if (
         currentRole !== "student" ||
@@ -4012,31 +5524,19 @@ function renderCurrentStudent() {
     }
 
 
-    const profile =
-        students.find(
-            student =>
-                student.uid ===
-                currentUser.uid
-        );
-
-
-    const learning = currentRoomMembership;
-    const student = learning || profile;
-
-
-    if (!student) {
-        document.getElementById("learningRoomKey").textContent =
-            currentUser.roomKey || "No room joined";
-        document.getElementById("learningRoomStatus").textContent =
-            "No Unity progress found";
-        return;
-    }
-
-
-    const firstLetter =
-        student.nickname
-            .charAt(0)
-            .toUpperCase();
+    const profile = generalKnowledgeStudents.find(
+        student => student.uid === currentUser.uid
+    );
+    const learning = currentRoomMembership ||
+        studentRoomHistory.find(
+            room => room.roomKey === selectedStudentRoomKey
+        ) || null;
+    const playerName =
+        profile?.nickname ||
+        currentUser.profile?.nickname ||
+        learning?.nickname ||
+        "Tuklask User";
+    const firstLetter = playerName.charAt(0).toUpperCase();
 
 
     const profileInitial =
@@ -4054,7 +5554,7 @@ function renderCurrentStudent() {
     document
         .getElementById("studentName")
         .textContent =
-            profile?.nickname || student.nickname;
+            playerName;
 
 
     document
@@ -4066,68 +5566,39 @@ function renderCurrentStudent() {
     document
         .getElementById("studentLevel")
         .textContent =
-            student.progress.level;
+            profile?.progress.level || 0;
 
 
     document
         .getElementById("studentExp")
         .textContent =
             formatNumber(
-                student.progress.exp
+                profile?.progress.exp || 0
             );
 
 
     document
         .getElementById("studentStage")
         .textContent =
-            student.progress.currentStage;
-
-
-    document
-        .getElementById("studentNumber")
-        .textContent =
-            student.studentNumber || profile?.studentNumber || "-";
-
-
-    document
-        .getElementById("studentSection")
-        .textContent =
-            student.yearSection || profile?.yearSection || "-";
-
-
-    document
-        .getElementById("learningRoomKey")
-        .textContent =
-            learning?.roomKey ||
-            currentUser.roomKey ||
-            "No room joined";
-
-
-    document
-        .getElementById("learningRoomStatus")
-        .textContent = learning
-            ? (learning.status === "completed"
-                ? "Completed"
-                : "In progress")
-            : "No Unity progress found";
+            profile?.progress.currentStage || 0;
 
 
     document
         .getElementById("progressStage")
         .textContent =
-            student.progress.currentStage;
+            profile?.progress.currentStage || 0;
 
 
     document
         .getElementById("progressLevel")
         .textContent =
-            student.statistics.correctAnswers;
+            profile?.statistics.correctAnswers || 0;
 
 
     document
         .getElementById("progressExp")
         .textContent =
-            student.statistics.wrongAnswers;
+            profile?.statistics.wrongAnswers || 0;
 
 
     document
@@ -4135,34 +5606,48 @@ function renderCurrentStudent() {
             "progressCompleted"
         )
         .textContent =
-            learning?.monstersDefeated ??
-            getStagesCompleted(student);
+            profile ? getStagesCompleted(profile) : 0;
 
 
     document
         .getElementById("quizCorrect")
         .textContent =
-            student.statistics.correctAnswers;
+            learning?.statistics.correctAnswers || 0;
 
 
     document
         .getElementById("quizWrong")
         .textContent =
-            student.statistics.wrongAnswers;
+            learning?.statistics.wrongAnswers || 0;
 
 
     document
         .getElementById("quizResult")
         .textContent =
-            `${calculateAccuracy(student)}%`;
+            `${learning ? calculateAccuracy(learning) : 0}%`;
 
 
     document
         .getElementById("recordRoomKey")
         .textContent =
             learning?.roomKey ||
-            currentUser.roomKey ||
             "-";
+
+    document
+        .getElementById("recordTeacherName")
+        .textContent = learning?.teacherName || "-";
+
+    document
+        .getElementById("recordYearSection")
+        .textContent = learning?.yearSection || "-";
+
+    document
+        .getElementById("recordStatus")
+        .textContent = learning
+            ? (learning.status === "completed"
+                ? "Completed"
+                : "In Progress")
+            : "Not started";
 
 
     document
@@ -4170,8 +5655,8 @@ function renderCurrentStudent() {
         .textContent =
             learning?.totalQuestions ||
             (
-                student.statistics.correctAnswers +
-                student.statistics.wrongAnswers
+                (learning?.statistics.correctAnswers || 0) +
+                (learning?.statistics.wrongAnswers || 0)
             );
 
 
@@ -4266,6 +5751,8 @@ document
             currentUser = null;
             currentRole = null;
             students = [];
+            generalKnowledgeStudents = [];
+            learningBasedStudents = [];
 
 
             showPage("endPage");

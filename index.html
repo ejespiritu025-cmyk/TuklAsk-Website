@@ -9,7 +9,17 @@
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Tuklask Tracker</title>
+    <meta
+        name="description"
+        content="Tuklask learning analytics portal for teachers and students."
+    >
+
+    <meta
+        name="theme-color"
+        content="#0b1117"
+    >
+
+    <title>Tuklask Learning Portal</title>
 
     <link
         rel="stylesheet"
@@ -40,7 +50,7 @@
                 <h1>TUKLASK</h1>
 
                 <p>
-                    Game Progress Tracker
+                    Learning Progress &amp; Assessment Portal
                 </p>
             </div>
 
@@ -56,12 +66,12 @@
                 </span>
 
                 <h2>
-                    Login
+                    Welcome back
                 </h2>
 
                 <p>
-                    Monitor Tuklask game progress,
-                    statistics and rankings.
+                    Sign in to manage learning rooms, questions,
+                    student progress and rankings.
                 </p>
 
             </div>
@@ -116,7 +126,7 @@
                     </option>
 
                     <option value="student">
-                        Student
+                        User
                     </option>
 
                 </select>
@@ -488,11 +498,11 @@
                 <article class="stat-card">
 
                     <span class="stat-label">
-                        Total Students
+                        General Knowledge Players
                     </span>
 
                     <strong
-                        id="totalStudents"
+                        id="generalTotalStudents"
                         class="stat-value"
                     >
                         0
@@ -506,11 +516,11 @@
                 <article class="stat-card">
 
                     <span class="stat-label">
-                        Active Students
+                        Stages Completed
                     </span>
 
                     <strong
-                        id="activeStudents"
+                        id="generalStagesCompleted"
                         class="stat-value"
                     >
                         0
@@ -524,11 +534,11 @@
                 <article class="stat-card">
 
                     <span class="stat-label">
-                        Total Stages Completed
+                        Average Level
                     </span>
 
                     <strong
-                        id="totalStagesCompleted"
+                        id="generalAverageLevel"
                         class="stat-value"
                     >
                         0
@@ -542,11 +552,11 @@
                 <article class="stat-card">
 
                     <span class="stat-label">
-                        Average Level
+                        Average EXP
                     </span>
 
                     <strong
-                        id="averageLevel"
+                        id="generalAverageExp"
                         class="stat-value"
                     >
                         0
@@ -560,11 +570,11 @@
                 <article class="stat-card">
 
                     <span class="stat-label">
-                        Average EXP
+                        Average Accuracy
                     </span>
 
                     <strong
-                        id="averageExp"
+                        id="generalAverageAccuracy"
                         class="stat-value"
                     >
                         0
@@ -578,6 +588,43 @@
 
 
             <section class="panel">
+                <div class="panel-heading">
+                    <div>
+                        <span class="eyebrow">LEARNING-BASED</span>
+                        <h2>Room Records</h2>
+                        <p>Results saved by the Unity Learning-Based mode.</p>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <article class="stat-card">
+                        <span class="stat-label">Room Memberships</span>
+                        <strong id="learningTotalStudents" class="stat-value">0</strong>
+                        <span class="stat-line blue-line"></span>
+                    </article>
+
+                    <article class="stat-card">
+                        <span class="stat-label">In Progress</span>
+                        <strong id="learningInProgress" class="stat-value">0</strong>
+                        <span class="stat-line yellow-line"></span>
+                    </article>
+
+                    <article class="stat-card">
+                        <span class="stat-label">Completed</span>
+                        <strong id="learningCompleted" class="stat-value">0</strong>
+                        <span class="stat-line blue-line"></span>
+                    </article>
+
+                    <article class="stat-card">
+                        <span class="stat-label">Questions Answered</span>
+                        <strong id="learningAnswered" class="stat-value">0</strong>
+                        <span class="stat-line red-line"></span>
+                    </article>
+                </div>
+            </section>
+
+
+            <section class="panel">
 
                 <div class="panel-heading">
 
@@ -588,11 +635,11 @@
                         </span>
 
                         <h2>
-                            Top Players
+                            General Knowledge Top Players
                         </h2>
 
                         <p>
-                            Highest ranked students from your rooms based on EXP.
+                            Stage-based rankings from General Knowledge mode.
                         </p>
 
                     </div>
@@ -849,7 +896,7 @@
                     </h1>
 
                     <p>
-                        Rankings include only students assigned to your room keys.
+                        Learning-Based results from students in your rooms.
                     </p>
 
                 </div>
@@ -870,7 +917,7 @@
                         <input
                             id="adminLeaderboardSearch"
                             type="text"
-                            placeholder="Nickname or student number"
+                            placeholder="Full name, nickname or student number"
                         >
 
                     </div>
@@ -892,11 +939,13 @@
                     <div class="filter-field">
 
                         <label for="adminLeaderboardLevel">
-                            Level
+                            Status
                         </label>
 
                         <select id="adminLeaderboardLevel">
-                            <option value="all">All Levels</option>
+                            <option value="all">All Statuses</option>
+                            <option value="completed">Completed</option>
+                            <option value="in_progress">In Progress</option>
                         </select>
 
                     </div>
@@ -927,20 +976,16 @@
                                 Ranking
                             </option>
 
-                            <option value="expHigh">
-                                Highest EXP
+                            <option value="answeredHigh">
+                                Most Answered
                             </option>
 
-                            <option value="expLow">
-                                Lowest EXP
+                            <option value="correctHigh">
+                                Most Correct
                             </option>
 
-                            <option value="levelHigh">
-                                Highest Level
-                            </option>
-
-                            <option value="levelLow">
-                                Lowest Level
+                            <option value="completedFirst">
+                                Completed First
                             </option>
 
                             <option value="nameAZ">
@@ -999,15 +1044,15 @@
 
                             <tr>
                                 <th>Rank</th>
-                                <th>Player</th>
+                                <th>Full Name</th>
                                 <th>Student Number</th>
-                                <th>Room Key</th>
-                                <th>Section</th>
-                                <th>Level</th>
-                                <th>EXP</th>
-                                <th>Stage</th>
+                                <th>Nickname</th>
+                                <th>Section / Year</th>
+                                <th>Room</th>
+                                <th>Status</th>
                                 <th>Correct</th>
                                 <th>Wrong</th>
+                                <th>Answered</th>
                             </tr>
 
                         </thead>
@@ -1311,6 +1356,104 @@
 
                 </div>
 
+
+            </section>
+
+
+            <section class="panel csv-import-panel">
+
+                <div class="panel-heading panel-heading-row">
+
+                    <div>
+                        <span class="eyebrow">BULK UPLOAD</span>
+                        <h2>Import Questions from CSV</h2>
+                        <p>Drop a CSV file here. Every imported question will use the active room selected above.</p>
+                    </div>
+
+                    <button
+                        id="downloadCsvTemplateButton"
+                        class="button button-secondary"
+                        type="button"
+                    >
+                        Download Template
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="csvDropZone"
+                    class="csv-drop-zone"
+                    role="button"
+                    tabindex="0"
+                    aria-controls="csvFileInput"
+                >
+                    <strong>Drop your CSV file here</strong>
+                    <span>or click to choose a file</span>
+                    <small>Maximum 200 questions · 1 MB</small>
+
+                    <input
+                        id="csvFileInput"
+                        type="file"
+                        accept=".csv,text/csv"
+                        hidden
+                    >
+                </div>
+
+
+                <p
+                    id="csvImportMessage"
+                    class="question-form-message"
+                    role="status"
+                    aria-live="polite"
+                >
+                    Required columns: question, optionA, optionB, optionC, optionD, correctAnswer.
+                </p>
+
+
+                <div
+                    id="csvPreviewWrapper"
+                    class="csv-preview-wrapper hidden"
+                >
+                    <div class="panel-heading panel-heading-row csv-preview-heading">
+                        <div>
+                            <h3>Import Preview</h3>
+                            <p id="csvPreviewSummary"></p>
+                        </div>
+
+                        <div class="question-form-actions">
+                            <button
+                                id="clearCsvButton"
+                                class="button button-secondary"
+                                type="button"
+                            >
+                                Clear
+                            </button>
+
+                            <button
+                                id="importCsvButton"
+                                class="button button-primary"
+                                type="button"
+                                disabled
+                            >
+                                Import Questions
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="csv-preview-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Question</th>
+                                    <th>Correct</th>
+                                </tr>
+                            </thead>
+                            <tbody id="csvPreviewTable"></tbody>
+                        </table>
+                    </div>
+                </div>
 
             </section>
 
@@ -1630,7 +1773,7 @@
                 </strong>
 
                 <small>
-                    Student
+                    User
                 </small>
 
             </div>
@@ -1658,7 +1801,7 @@
                 </strong>
 
                 <span>
-                    Student Tracker
+                    User Tracker
                 </span>
 
             </div>
@@ -1680,7 +1823,7 @@
                 class="nav-button student-nav"
                 data-student-page="studentProgress"
             >
-                Learning Progress
+                General Knowledge Records
             </button>
 
 
@@ -1734,7 +1877,7 @@
                 <div>
 
                     <span class="eyebrow">
-                        STUDENT
+                        USER
                     </span>
 
                     <h1>
@@ -1742,7 +1885,7 @@
                     </h1>
 
                     <p>
-                        Your Tuklask player information.
+                        Your General Knowledge stage progress.
                     </p>
 
                 </div>
@@ -1832,41 +1975,6 @@
                 </article>
 
 
-                <article class="stat-card">
-
-                    <span class="stat-label">
-                        Student Number
-                    </span>
-
-                    <strong
-                        id="studentNumber"
-                        class="stat-value stat-value-small"
-                    >
-                        -
-                    </strong>
-
-                    <span class="stat-line blue-line"></span>
-
-                </article>
-
-
-                <article class="stat-card">
-
-                    <span class="stat-label">
-                        Year / Section
-                    </span>
-
-                    <strong
-                        id="studentSection"
-                        class="stat-value stat-value-small"
-                    >
-                        -
-                    </strong>
-
-                    <span class="stat-line yellow-line"></span>
-
-                </article>
-
             </div>
 
         </section>
@@ -1882,32 +1990,20 @@
                 <div>
 
                     <span class="eyebrow">
-                        STUDENT
+                        USER
                     </span>
 
                     <h1>
-                        My Learning Progress
+                        General Knowledge Records
                     </h1>
 
                     <p>
-                        Live progress from your current learning-tool room.
+                        Your stage-based General Knowledge results from the game.
                     </p>
 
                 </div>
 
             </div>
-
-
-            <section class="panel learning-room-summary">
-                <div>
-                    <span class="stat-label">Room Key</span>
-                    <strong id="learningRoomKey">No room joined</strong>
-                </div>
-                <div>
-                    <span class="stat-label">Status</span>
-                    <strong id="learningRoomStatus">Not started</strong>
-                </div>
-            </section>
 
 
             <div class="large-card-grid">
@@ -1960,7 +2056,7 @@
                 <article class="large-card">
 
                     <span>
-                        Monsters Defeated
+                        Stages Completed
                     </span>
 
                     <strong id="progressCompleted">
@@ -1986,7 +2082,7 @@
                 <div>
 
                     <span class="eyebrow">
-                        STUDENT
+                        USER
                     </span>
 
                     <h1>
@@ -1994,7 +2090,7 @@
                     </h1>
 
                     <p>
-                        Review the latest result saved by the Unity game.
+                        Select a joined room to view its Learning-Based result.
                     </p>
 
                 </div>
@@ -2002,21 +2098,41 @@
             </div>
 
 
+            <div class="room-history-layout">
+                <section class="panel room-history-panel">
+                    <div class="panel-heading">
+                        <div>
+                            <span class="eyebrow">ROOM HISTORY</span>
+                            <h2>Joined Rooms</h2>
+                            <p>Current and previously joined Learning-Based rooms.</p>
+                        </div>
+                    </div>
+                    <div id="studentRoomHistoryList" class="room-history-list"></div>
+                    <p id="studentRoomHistoryMessage" class="form-message"></p>
+                </section>
+
+                <section class="panel learning-room-summary">
+                    <div>
+                        <span class="stat-label">Selected Room</span>
+                        <strong id="recordRoomKey">-</strong>
+                    </div>
+                    <div>
+                        <span class="stat-label">Teacher</span>
+                        <strong id="recordTeacherName">-</strong>
+                    </div>
+                    <div>
+                        <span class="stat-label">Section / Year</span>
+                        <strong id="recordYearSection">-</strong>
+                    </div>
+                    <div>
+                        <span class="stat-label">Status</span>
+                        <strong id="recordStatus">Not started</strong>
+                    </div>
+                </section>
+            </div>
+
+
             <div class="large-card-grid">
-
-                <article class="large-card">
-
-                    <span>
-                        Room Key
-                    </span>
-
-                    <strong id="recordRoomKey">
-                        -
-                    </strong>
-
-                    <div class="large-card-line blue-background"></div>
-
-                </article>
 
                 <article class="large-card">
 
@@ -2107,7 +2223,7 @@
                 <div>
 
                     <span class="eyebrow">
-                        STUDENT
+                        USER
                     </span>
 
                     <h1>
@@ -2128,6 +2244,25 @@
 
                 <div class="filter-grid leaderboard-filter-grid">
 
+                    <div class="filter-field">
+                        <label for="studentLeaderboardMode">
+                            Category
+                        </label>
+                        <select id="studentLeaderboardMode">
+                            <option value="general">General Knowledge</option>
+                            <option value="learning">Learning-Based</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-field" id="studentLeaderboardRoomField">
+                        <label for="studentLeaderboardRoom">
+                            Room / Teacher
+                        </label>
+                        <select id="studentLeaderboardRoom">
+                            <option value="all">All Joined Rooms</option>
+                        </select>
+                    </div>
+
                     <div class="filter-field filter-search">
 
                         <label for="studentLeaderboardSearch">
@@ -2143,7 +2278,7 @@
                     </div>
 
 
-                    <div class="filter-field">
+                    <div class="filter-field" id="studentLeaderboardLevelField">
 
                         <label for="studentLeaderboardLevel">
                             Level
@@ -2156,7 +2291,7 @@
                     </div>
 
 
-                    <div class="filter-field">
+                    <div class="filter-field" id="studentLeaderboardSectionField">
 
                         <label for="studentLeaderboardSection">
                             Section
@@ -2169,7 +2304,7 @@
                     </div>
 
 
-                    <div class="filter-field">
+                    <div class="filter-field" id="studentLeaderboardSortField">
 
                         <label for="studentLeaderboardSort">
                             Sort
@@ -2249,7 +2384,7 @@
 
                     <table>
 
-                        <thead>
+                        <thead id="studentLeaderboardHead">
 
                             <tr>
                                 <th>Rank</th>

@@ -1,0 +1,52 @@
+TUKLASK TRACKER - FREE FIREBASE SPARK SETUP
+
+This version uses no Cloud Functions and does not require the Blaze plan.
+
+HOW TEACHER ACTIVATION WORKS
+
+1. The person selects Create Teacher Account.
+2. The website creates a teacherRegistration record and sends Firebase's
+   verification email.
+3. The person clicks the verification link and signs in again.
+4. Realtime Database rules check the trusted email_verified value in the
+   Firebase Authentication token.
+5. The website activates admins/{uid} and opens the teacher dashboard.
+
+IMPORTANT
+
+This is intentionally self-service. Anyone who registers through the teacher
+form and verifies their email can become a teacher. Email verification proves
+email ownership; it does not prove that the person is a real teacher.
+
+FIREBASE CONSOLE SETUP
+
+1. Authentication > Sign-in method:
+   Enable Email/Password.
+
+2. Authentication > Templates > Email address verification:
+   Customize the subject and message if desired.
+
+3. Authentication > Settings > Authorized domains:
+   Add the domain where the website is hosted.
+
+4. Realtime Database > Rules:
+   Copy the complete contents of database.rules.json into the Rules editor and
+   click Publish.
+
+OPTIONAL FIREBASE CLI DEPLOYMENT
+
+Run these commands from this folder:
+
+  npm install -g firebase-tools
+  firebase login
+  firebase use tuklask-14f31
+  firebase deploy --only database,hosting
+
+Do not deploy Functions. This package does not use them.
+
+TESTING
+
+1. Existing student: sign in and confirm the student dashboard opens.
+2. New teacher: register, click the verification email, return, and sign in.
+3. Unverified teacher: register and sign in without clicking the link; access
+   must be blocked and another verification email should be requested.
