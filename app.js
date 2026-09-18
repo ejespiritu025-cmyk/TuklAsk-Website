@@ -591,6 +591,11 @@ async function handleLogin() {
             .getElementById("loginPassword")
             .value;
 
+    const selectedRole =
+        document
+            .getElementById("loginRole")
+            .value;
+
     const errorElement =
         document.getElementById("loginError");
 
@@ -616,6 +621,14 @@ async function handleLogin() {
     if (!password) {
         errorElement.textContent =
             "Enter your password.";
+
+        return;
+    }
+
+
+    if (!selectedRole) {
+        errorElement.textContent =
+            "Select your account role.";
 
         return;
     }
@@ -664,11 +677,25 @@ async function handleLogin() {
             adminRecord?.role === "teacher";
 
         if (hasTeacherRole) {
+            if (selectedRole !== "admin") {
+                await signOut(auth);
+                errorElement.textContent =
+                    "This account has Teacher / Admin privileges. Select Teacher / Admin to continue.";
+                return;
+            }
+
             openTeacherDashboard(firebaseUser, email);
             return;
         }
 
         if (teacherRegistrationSnapshot.exists()) {
+            if (selectedRole !== "admin") {
+                await signOut(auth);
+                errorElement.textContent =
+                    "This is a Teacher / Admin account. Select Teacher / Admin to continue.";
+                return;
+            }
+
             if (!firebaseUser.emailVerified) {
                 try {
                     await sendEmailVerification(firebaseUser);
@@ -713,6 +740,13 @@ async function handleLogin() {
             await signOut(auth);
             errorElement.textContent =
                 "No Tuklask user or teacher registration was found for this account.";
+            return;
+        }
+
+        if (selectedRole !== "student") {
+            await signOut(auth);
+            errorElement.textContent =
+                "This account has no Teacher / Admin privileges. Select User to continue.";
             return;
         }
 
@@ -4223,14 +4257,6 @@ function populateAllFilters() {
         )
     ].sort((a, b) => a - b);
 
-    const generalSections = [
-        ...new Set(
-            generalKnowledgeStudents.map(
-                student => student.yearSection
-            )
-        )
-    ].sort();
-
     const learningRoomKeys = [
         ...new Set(
             learningBasedStudents
@@ -4269,12 +4295,6 @@ function populateAllFilters() {
         "adminLeaderboardRoom",
         learningRoomKeys,
         "All My Rooms"
-    );
-
-    populateSelect(
-        "studentLeaderboardSection",
-        generalSections,
-        "All Sections"
     );
 
     populateSelect(
@@ -4988,9 +5008,6 @@ function getStudentGeneralLeaderboard() {
     const level = document
         .getElementById("studentLeaderboardLevel")
         .value;
-    const section = document
-        .getElementById("studentLeaderboardSection")
-        .value;
     const sort = document
         .getElementById("studentLeaderboardSort")
         .value;
@@ -5001,8 +5018,7 @@ function getStudentGeneralLeaderboard() {
     let result = generalKnowledgeStudents.filter(student =>
         [student.nickname, student.studentNumber]
             .join(" ").toLowerCase().includes(search) &&
-        (level === "all" || String(student.progress.level) === level) &&
-        (section === "all" || student.yearSection === section)
+        (level === "all" || String(student.progress.level) === level)
     );
 
     result = [...result];
@@ -5174,7 +5190,6 @@ function renderAdminLeaderboard() {
    Students see:
    - Rank
    - Nickname
-   - Section
    - Level
    - EXP
    - Stage
@@ -5207,7 +5222,6 @@ function renderStudentLeaderboard() {
 
     [
         "studentLeaderboardLevelField",
-        "studentLeaderboardSectionField",
         "studentLeaderboardSortField"
     ].forEach(id => {
         document
@@ -5221,7 +5235,6 @@ function renderStudentLeaderboard() {
                 <tr>
                     <th>Rank</th>
                     <th>Player</th>
-                    <th>Section / Year</th>
                     <th>Status</th>
                 </tr>
             `
@@ -5229,7 +5242,6 @@ function renderStudentLeaderboard() {
                 <tr>
                     <th>Rank</th>
                     <th>Player</th>
-                    <th>Section</th>
                     <th>Level</th>
                     <th>EXP</th>
                     <th>Stage</th>
@@ -5244,7 +5256,7 @@ function renderStudentLeaderboard() {
     if (list.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="${mode === "learning" ? 4 : 6}">
+                <td colspan="${mode === "learning" ? 3 : 5}">
                     No players found.
                 </td>
             </tr>
@@ -5275,7 +5287,6 @@ function renderStudentLeaderboard() {
                 <td class="nickname-cell">
                     ${escapeHTML(student.nickname)}
                 </td>
-                <td>${escapeHTML(student.yearSection)}</td>
                 <td>
                     <span class="status-badge ${
                         student.status === "completed"
@@ -5293,7 +5304,6 @@ function renderStudentLeaderboard() {
                 <td class="nickname-cell">
                     ${escapeHTML(student.nickname)}
                 </td>
-                <td>${escapeHTML(student.yearSection)}</td>
                 <td class="level-cell">${student.progress.level}</td>
                 <td class="exp-cell">${formatNumber(student.progress.exp)}</td>
                 <td>${student.progress.currentStage}</td>
@@ -5317,14 +5327,16 @@ function renderStudentLeaderboard() {
     const ids = [
         `${role}LeaderboardSearch`,
         `${role}LeaderboardLevel`,
-        `${role}LeaderboardSection`,
         `${role}LeaderboardSort`,
         `${role}LeaderboardTop`
     ];
 
 
     if (role === "admin") {
-        ids.push("adminLeaderboardRoom");
+        ids.push(
+            "adminLeaderboardSection",
+            "adminLeaderboardRoom"
+        );
     }
 
     else {
@@ -5390,17 +5402,16 @@ function renderStudentLeaderboard() {
                     .value = "all";
 
 
-                document
-                    .getElementById(
-                        `${role}LeaderboardSection`
-                    )
-                    .value = "all";
-
-
                 if (role === "admin") {
                     document
                         .getElementById(
                             "adminLeaderboardRoom"
+                        )
+                        .value = "all";
+
+                    document
+                        .getElementById(
+                            "adminLeaderboardSection"
                         )
                         .value = "all";
                 }
