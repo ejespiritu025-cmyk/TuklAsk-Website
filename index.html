@@ -896,8 +896,8 @@
                         Leaderboard
                     </h1>
 
-                    <p>
-                        Learning-Based results from students in your rooms.
+                    <p id="adminLeaderboardDescription">
+                        General Knowledge stage-based results from all users.
                     </p>
 
                 </div>
@@ -908,6 +908,16 @@
             <section class="panel">
 
                 <div class="filter-grid leaderboard-filter-grid">
+
+                    <div class="filter-field">
+                        <label for="adminLeaderboardMode">
+                            Category
+                        </label>
+                        <select id="adminLeaderboardMode">
+                            <option value="general">General Knowledge</option>
+                            <option value="learning">Learning-Based</option>
+                        </select>
+                    </div>
 
                     <div class="filter-field filter-search">
 
@@ -924,7 +934,10 @@
                     </div>
 
 
-                    <div class="filter-field">
+                    <div
+                        id="adminLeaderboardRoomField"
+                        class="filter-field hidden"
+                    >
 
                         <label for="adminLeaderboardRoom">
                             Room Key
@@ -937,7 +950,10 @@
                     </div>
 
 
-                    <div class="filter-field">
+                    <div
+                        id="adminLeaderboardStatusField"
+                        class="filter-field hidden"
+                    >
 
                         <label for="adminLeaderboardLevel">
                             Status
@@ -952,7 +968,10 @@
                     </div>
 
 
-                    <div class="filter-field">
+                    <div
+                        id="adminLeaderboardSectionField"
+                        class="filter-field hidden"
+                    >
 
                         <label for="adminLeaderboardSection">
                             Section
@@ -960,6 +979,22 @@
 
                         <select id="adminLeaderboardSection">
                             <option value="all">All Sections</option>
+                        </select>
+
+                    </div>
+
+
+                    <div
+                        id="adminLeaderboardGeneralLevelField"
+                        class="filter-field"
+                    >
+
+                        <label for="adminLeaderboardGeneralLevel">
+                            Level
+                        </label>
+
+                        <select id="adminLeaderboardGeneralLevel">
+                            <option value="all">All Levels</option>
                         </select>
 
                     </div>
@@ -977,16 +1012,20 @@
                                 Ranking
                             </option>
 
-                            <option value="answeredHigh">
-                                Most Answered
+                            <option value="expHigh">
+                                Highest EXP
                             </option>
 
-                            <option value="correctHigh">
-                                Most Correct
+                            <option value="expLow">
+                                Lowest EXP
                             </option>
 
-                            <option value="completedFirst">
-                                Completed First
+                            <option value="levelHigh">
+                                Highest Level
+                            </option>
+
+                            <option value="levelLow">
+                                Lowest Level
                             </option>
 
                             <option value="nameAZ">
@@ -1041,7 +1080,7 @@
 
                     <table>
 
-                        <thead>
+                        <thead id="adminLeaderboardHead">
 
                             <tr>
                                 <th>Rank</th>
@@ -1049,8 +1088,9 @@
                                 <th>Student Number</th>
                                 <th>Nickname</th>
                                 <th>Year / Section</th>
-                                <th>Room</th>
-                                <th>Status</th>
+                                <th>Stage</th>
+                                <th>Level</th>
+                                <th>EXP</th>
                                 <th>Correct</th>
                                 <th>Wrong</th>
                                 <th>Answered</th>

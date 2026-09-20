@@ -71,9 +71,7 @@ let learningBasedStudents = [];
 let unsubscribeUsers = null;
 let unsubscribeOwnedRooms = null;
 let unsubscribeAdminRoomUsers = [];
-let unsubscribeAdminGeneralUsers = [];
 let adminRoomStudentGroups = new Map();
-let adminGeneralStudentGroups = new Map();
 let ownedRoomKeys = [];
 let ownedRooms = [];
 let selectedRoomMembersKey = "";
@@ -131,6 +129,10 @@ function normalizeStudent(uid, user) {
         recordType: "general",
 
         email: user?.email || "",
+
+        fullName: String(
+            user?.fullName || user?.name || ""
+        ),
 
         nickname:
             user?.nickname || "Unknown Player",
@@ -880,6 +882,7 @@ function startUsersListener() {
 
 
     if (currentRole === "admin") {
+        startAdminGeneralUsersListener();
         startAdminRoomUsersListener();
         return;
     }
@@ -955,6 +958,39 @@ function startUsersListener() {
 }
 
 
+function startAdminGeneralUsersListener() {
+    unsubscribeUsers = onValue(
+        ref(database, "users"),
+
+        snapshot => {
+            const firebaseUsers = snapshot.val() || {};
+
+            generalKnowledgeStudents = calculateGlobalRanking(
+                Object.entries(firebaseUsers).map(([uid, user]) =>
+                    normalizeStudent(uid, user)
+                )
+            );
+
+            renderEverything();
+        },
+
+        error => {
+            console.error(
+                "Firebase admin General Knowledge users read failed:",
+                error
+            );
+
+            generalKnowledgeStudents = [];
+            renderEverything();
+
+            alert(
+                "Unable to load General Knowledge records. Deploy the updated Realtime Database rules and try again."
+            );
+        }
+    );
+}
+
+
 function startAdminRoomUsersListener() {
     const ownedRoomsReference =
         query(
@@ -994,7 +1030,6 @@ function startAdminRoomUsersListener() {
 
                 if (!ownedRoomKeys.length) {
                     students = [];
-                    generalKnowledgeStudents = [];
                     learningBasedStudents = [];
                     clearActiveRoomKey();
                     renderEverything();
@@ -1076,48 +1111,6 @@ function startAdminRoomUsersListener() {
                     unsubscribeAdminRoomUsers.push(
                         unsubscribe
                     );
-
-
-                    adminGeneralStudentGroups.set(
-                        roomKey,
-                        []
-                    );
-
-                    const generalStudentsReference = query(
-                        ref(database, "users"),
-                        orderByChild("roomKey"),
-                        equalTo(roomKey)
-                    );
-
-                    const unsubscribeGeneral = onValue(
-                        generalStudentsReference,
-                        generalSnapshot => {
-                            const generalUsers =
-                                generalSnapshot.val() || {};
-
-                            adminGeneralStudentGroups.set(
-                                roomKey,
-                                Object.entries(generalUsers)
-                                    .map(([uid, user]) =>
-                                        normalizeStudent(uid, user)
-                                    )
-                            );
-
-                            rebuildAdminGeneralStudents();
-                        },
-                        error => {
-                            console.error(
-                                `Firebase general-knowledge users read failed for room ${roomKey}:`,
-                                error
-                            );
-                            adminGeneralStudentGroups.set(roomKey, []);
-                            rebuildAdminGeneralStudents();
-                        }
-                    );
-
-                    unsubscribeAdminGeneralUsers.push(
-                        unsubscribeGeneral
-                    );
                 });
             },
 
@@ -1128,7 +1121,6 @@ function startAdminRoomUsersListener() {
                 );
 
                 students = [];
-                generalKnowledgeStudents = [];
                 learningBasedStudents = [];
                 renderEverything();
 
@@ -1206,35 +1198,12 @@ function calculateLearningRanking(list) {
 }
 
 
-function rebuildAdminGeneralStudents() {
-    const uniqueStudents = new Map();
-
-    adminGeneralStudentGroups.forEach(roomStudents => {
-        roomStudents.forEach(student => {
-            uniqueStudents.set(student.uid, student);
-        });
-    });
-
-    generalKnowledgeStudents = calculateGlobalRanking(
-        [...uniqueStudents.values()]
-    );
-
-    renderEverything();
-}
-
-
 function stopAdminRoomUserListeners() {
     unsubscribeAdminRoomUsers
         .forEach(unsubscribe => unsubscribe());
 
     unsubscribeAdminRoomUsers = [];
     adminRoomStudentGroups.clear();
-
-    unsubscribeAdminGeneralUsers
-        .forEach(unsubscribe => unsubscribe());
-
-    unsubscribeAdminGeneralUsers = [];
-    adminGeneralStudentGroups.clear();
 }
 
 
@@ -4308,7 +4277,7 @@ function renderTopPlayers() {
 
     if (generalKnowledgeStudents.length === 0) {
         container.innerHTML =
-            "<p>No students are assigned to your rooms yet.</p>";
+            "<p>No General Knowledge records were found.</p>";
 
         return;
     }
@@ -4404,6 +4373,13 @@ function populateAllFilters() {
 
     populateSelect(
         "studentLeaderboardLevel",
+        generalLevels,
+        "All Levels",
+        value => `Level ${value}`
+    );
+
+    populateSelect(
+        "adminLeaderboardGeneralLevel",
         generalLevels,
         "All Levels",
         value => `Level ${value}`
@@ -5044,6 +5020,137 @@ function getFilteredLeaderboard(role) {
    ADMIN LEADERBOARD
 ================================================== */
 
+function getAdminLeaderboardMode() {
+    return document
+        .getElementById("adminLeaderboardMode")
+        ?.value || "general";
+}
+
+
+function configureAdminLeaderboard(mode) {
+    const isLearning = mode === "learning";
+
+    [
+        "adminLeaderboardRoomField",
+        "adminLeaderboardStatusField",
+        "adminLeaderboardSectionField"
+    ].forEach(id => {
+        document
+            .getElementById(id)
+            ?.classList.toggle("hidden", !isLearning);
+    });
+
+    document
+        .getElementById("adminLeaderboardGeneralLevelField")
+        ?.classList.toggle("hidden", isLearning);
+
+    const description = document.getElementById(
+        "adminLeaderboardDescription"
+    );
+
+    if (description) {
+        description.textContent = isLearning
+            ? "Learning-Based results from students in your rooms."
+            : "General Knowledge stage-based results from all users.";
+    }
+
+    const sort = document.getElementById("adminLeaderboardSort");
+
+    if (sort?.dataset.mode !== mode) {
+        sort.dataset.mode = mode;
+        sort.innerHTML = isLearning
+            ? `
+                <option value="ranking">Ranking</option>
+                <option value="answeredHigh">Most Answered</option>
+                <option value="correctHigh">Most Correct</option>
+                <option value="completedFirst">Completed First</option>
+                <option value="nameAZ">Name A-Z</option>
+                <option value="nameZA">Name Z-A</option>
+            `
+            : `
+                <option value="ranking">Ranking</option>
+                <option value="expHigh">Highest EXP</option>
+                <option value="expLow">Lowest EXP</option>
+                <option value="levelHigh">Highest Level</option>
+                <option value="levelLow">Lowest Level</option>
+                <option value="nameAZ">Name A-Z</option>
+                <option value="nameZA">Name Z-A</option>
+            `;
+    }
+}
+
+
+function getAdminGeneralLeaderboard() {
+    const search = document
+        .getElementById("adminLeaderboardSearch")
+        .value.trim().toLowerCase();
+    const level = document
+        .getElementById("adminLeaderboardGeneralLevel")
+        .value;
+    const sort = document
+        .getElementById("adminLeaderboardSort")
+        .value;
+    const top = document
+        .getElementById("adminLeaderboardTop")
+        .value;
+
+    let result = generalKnowledgeStudents.filter(student => {
+        const searchable = [
+            student.fullName,
+            student.nickname,
+            student.studentNumber,
+            student.email
+        ].join(" ").toLowerCase();
+
+        return searchable.includes(search) &&
+            (level === "all" ||
+                String(student.progress.level) === level);
+    });
+
+    result = [...result];
+
+    switch (sort) {
+        case "expHigh":
+            result.sort((a, b) => b.progress.exp - a.progress.exp);
+            break;
+        case "expLow":
+            result.sort((a, b) => a.progress.exp - b.progress.exp);
+            break;
+        case "levelHigh":
+            result.sort((a, b) => b.progress.level - a.progress.level);
+            break;
+        case "levelLow":
+            result.sort((a, b) => a.progress.level - b.progress.level);
+            break;
+        case "nameAZ":
+            result.sort((a, b) =>
+                (a.fullName || a.nickname).localeCompare(
+                    b.fullName || b.nickname
+                )
+            );
+            break;
+        case "nameZA":
+            result.sort((a, b) =>
+                (b.fullName || b.nickname).localeCompare(
+                    a.fullName || a.nickname
+                )
+            );
+            break;
+        default:
+            result.sort((a, b) => a.rank - b.rank);
+    }
+
+    result = result.map((student, index) => ({
+        ...student,
+        displayRank: index + 1
+    }));
+
+    return top === "all"
+        ? result
+        : result.slice(0, Number(top));
+}
+
+
 function getAdminLearningLeaderboard() {
     const search = document
         .getElementById("adminLeaderboardSearch")
@@ -5216,7 +5323,7 @@ function getStudentLearningLeaderboard() {
     return result;
 }
 
-function renderAdminLeaderboard() {
+function renderAdminLearningLeaderboard() {
     const list =
         getAdminLearningLeaderboard();
 
@@ -5306,6 +5413,101 @@ function renderAdminLeaderboard() {
             </td>
         `;
 
+
+        tbody.appendChild(row);
+    });
+}
+
+
+function renderAdminLeaderboard() {
+    const mode = getAdminLeaderboardMode();
+    configureAdminLeaderboard(mode);
+
+    const head = document.getElementById(
+        "adminLeaderboardHead"
+    );
+
+    if (mode === "learning") {
+        head.innerHTML = `
+            <tr>
+                <th>Rank</th>
+                <th>Full Name</th>
+                <th>Student Number</th>
+                <th>Nickname</th>
+                <th>Year / Section</th>
+                <th>Room</th>
+                <th>Status</th>
+                <th>Correct</th>
+                <th>Wrong</th>
+                <th>Answered</th>
+            </tr>
+        `;
+
+        renderAdminLearningLeaderboard();
+        return;
+    }
+
+    const list = getAdminGeneralLeaderboard();
+    const tbody = document.getElementById(
+        "adminLeaderboardTable"
+    );
+
+    head.innerHTML = `
+        <tr>
+            <th>Rank</th>
+            <th>Full Name</th>
+            <th>Student Number</th>
+            <th>Nickname</th>
+            <th>Year / Section</th>
+            <th>Stage</th>
+            <th>Level</th>
+            <th>EXP</th>
+            <th>Correct</th>
+            <th>Wrong</th>
+            <th>Answered</th>
+        </tr>
+    `;
+
+    tbody.innerHTML = "";
+
+    if (!list.length) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="11">No players found.</td>
+            </tr>
+        `;
+        return;
+    }
+
+    list.forEach(student => {
+        const row = document.createElement("tr");
+        const answered =
+            student.statistics.correctAnswers +
+            student.statistics.wrongAnswers;
+
+        row.innerHTML = `
+            <td class="rank-cell">#${
+                student.displayRank || student.rank
+            }</td>
+            <td class="nickname-cell">${escapeHTML(
+                student.fullName || "Not provided"
+            )}</td>
+            <td>${escapeHTML(student.studentNumber || "-")}</td>
+            <td>${escapeHTML(student.nickname)}</td>
+            <td>${escapeHTML(student.yearSection)}</td>
+            <td>${student.progress.currentStage}</td>
+            <td class="level-cell">${student.progress.level}</td>
+            <td class="exp-cell">${formatNumber(
+                student.progress.exp
+            )}</td>
+            <td class="correct-cell">${
+                student.statistics.correctAnswers
+            }</td>
+            <td class="wrong-cell">${
+                student.statistics.wrongAnswers
+            }</td>
+            <td>${answered}</td>
+        `;
 
         tbody.appendChild(row);
     });
@@ -5464,6 +5666,8 @@ function renderStudentLeaderboard() {
 
     if (role === "admin") {
         ids.push(
+            "adminLeaderboardMode",
+            "adminLeaderboardGeneralLevel",
             "adminLeaderboardSection",
             "adminLeaderboardRoom"
         );
@@ -5533,6 +5737,16 @@ function renderStudentLeaderboard() {
 
 
                 if (role === "admin") {
+                    document
+                        .getElementById("adminLeaderboardMode")
+                        .value = "general";
+
+                    document
+                        .getElementById(
+                            "adminLeaderboardGeneralLevel"
+                        )
+                        .value = "all";
+
                     document
                         .getElementById(
                             "adminLeaderboardRoom"
