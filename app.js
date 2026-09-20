@@ -5339,7 +5339,7 @@ function renderAdminLearningLeaderboard() {
     if (list.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="10">
+                <td colspan="7">
                     No players found.
                 </td>
             </tr>
@@ -5360,23 +5360,7 @@ function renderAdminLearningLeaderboard() {
             </td>
 
             <td class="nickname-cell">
-                ${escapeHTML(
-                    student.fullName || "Not provided"
-                )}
-            </td>
-
-            <td>
-                ${escapeHTML(
-                    student.studentNumber
-                )}
-            </td>
-
-            <td>
                 ${escapeHTML(student.nickname)}
-            </td>
-
-            <td>
-                ${escapeHTML(student.yearSection)}
             </td>
 
             <td>
@@ -5431,10 +5415,7 @@ function renderAdminLeaderboard() {
         head.innerHTML = `
             <tr>
                 <th>Rank</th>
-                <th>Full Name</th>
-                <th>Student Number</th>
                 <th>Nickname</th>
-                <th>Year / Section</th>
                 <th>Room</th>
                 <th>Status</th>
                 <th>Correct</th>
@@ -5455,10 +5436,7 @@ function renderAdminLeaderboard() {
     head.innerHTML = `
         <tr>
             <th>Rank</th>
-            <th>Full Name</th>
-            <th>Student Number</th>
             <th>Nickname</th>
-            <th>Year / Section</th>
             <th>Stage</th>
             <th>Level</th>
             <th>EXP</th>
@@ -5473,7 +5451,7 @@ function renderAdminLeaderboard() {
     if (!list.length) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="11">No players found.</td>
+                <td colspan="8">No players found.</td>
             </tr>
         `;
         return;
@@ -5490,11 +5468,8 @@ function renderAdminLeaderboard() {
                 student.displayRank || student.rank
             }</td>
             <td class="nickname-cell">${escapeHTML(
-                student.fullName || "Not provided"
+                student.nickname
             )}</td>
-            <td>${escapeHTML(student.studentNumber || "-")}</td>
-            <td>${escapeHTML(student.nickname)}</td>
-            <td>${escapeHTML(student.yearSection)}</td>
             <td>${student.progress.currentStage}</td>
             <td class="level-cell">${student.progress.level}</td>
             <td class="exp-cell">${formatNumber(
