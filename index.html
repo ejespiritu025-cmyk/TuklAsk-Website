@@ -653,6 +653,7 @@
 
             </section>
 
+
         </section>
 
 
@@ -869,6 +870,7 @@
                 </div>
 
             </section>
+
 
         </section>
 
@@ -1169,7 +1171,7 @@
                     <div class="filter-field">
 
                         <label for="roomGradeLevel">
-                            Grade Level
+                            Grade/Year Level
                         </label>
 
                         <input
@@ -1265,6 +1267,65 @@
                             <tr>
                                 <td colspan="5" class="question-empty-state">
                                     Your rooms will appear here.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                </div>
+
+            </section>
+
+
+            <section
+                id="roomMembersPanel"
+                class="panel hidden"
+            >
+
+                <div class="panel-heading panel-heading-row">
+
+                    <div>
+                        <span class="eyebrow">ROOM MEMBERS</span>
+                        <h2 id="roomMembersTitle">Students in Room</h2>
+                        <p id="roomMembersDescription">
+                            Students who joined this Learning-Based room.
+                        </p>
+                    </div>
+
+                    <div class="room-members-heading-actions">
+                        <span
+                            id="roomMembersCount"
+                            class="question-count"
+                        >0 students</span>
+
+                        <button
+                            id="closeRoomMembers"
+                            class="close-button"
+                            type="button"
+                            aria-label="Close room members"
+                        >
+                            ×
+                        </button>
+                    </div>
+
+                </div>
+
+                <div class="table-wrapper">
+
+                    <table class="question-table room-members-table">
+                        <thead>
+                            <tr>
+                                <th>Full Name</th>
+                                <th>Student Number</th>
+                                <th>Nickname</th>
+                                <th>Year / Section</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="roomMembersTable">
+                            <tr>
+                                <td colspan="5" class="question-empty-state">
+                                    Select a room to view its students.
                                 </td>
                             </tr>
                         </tbody>
@@ -2120,7 +2181,7 @@
                         <strong id="recordTeacherName">-</strong>
                     </div>
                     <div>
-                        <span class="stat-label">Section / Year</span>
+                        <span class="stat-label">Year / Section</span>
                         <strong id="recordYearSection">-</strong>
                     </div>
                     <div>

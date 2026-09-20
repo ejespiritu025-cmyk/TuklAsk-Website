@@ -76,6 +76,7 @@ let adminRoomStudentGroups = new Map();
 let adminGeneralStudentGroups = new Map();
 let ownedRoomKeys = [];
 let ownedRooms = [];
+let selectedRoomMembersKey = "";
 let questions = [];
 let editingQuestionId = null;
 let unsubscribeQuestions = null;
@@ -1253,6 +1254,7 @@ function stopUsersListeners() {
     stopAdminRoomUserListeners();
     ownedRoomKeys = [];
     ownedRooms = [];
+    closeRoomMembersPanel();
 }
 
 
@@ -1915,6 +1917,11 @@ function renderRooms() {
 
 
     if (!ownedRooms.length) {
+        selectedRoomMembersKey = "";
+        document
+            .getElementById("roomMembersPanel")
+            ?.classList.add("hidden");
+
         tbody.innerHTML = `
             <tr>
                 <td colspan="5" class="question-empty-state">
@@ -1944,6 +1951,7 @@ function renderRooms() {
                 <td>${memberCount}</td>
                 <td>
                     <div class="question-actions">
+                        <button class="question-edit-button" type="button" data-room-action="members" data-room-key="${escapeHTML(room.key)}">View Students</button>
                         <button class="question-edit-button" type="button" data-room-action="use" data-room-key="${escapeHTML(room.key)}">Use</button>
                         <button class="question-edit-button" type="button" data-room-action="toggle" data-room-key="${escapeHTML(room.key)}">
                             ${room.active === false ? "Activate" : "Deactivate"}
@@ -1954,6 +1962,116 @@ function renderRooms() {
             </tr>
         `;
     }).join("");
+
+    renderRoomMembersPanel();
+}
+
+
+function renderRoomMembersPanel() {
+    const panel = document.getElementById("roomMembersPanel");
+    const tbody = document.getElementById("roomMembersTable");
+    const title = document.getElementById("roomMembersTitle");
+    const description = document.getElementById(
+        "roomMembersDescription"
+    );
+    const count = document.getElementById("roomMembersCount");
+
+    if (
+        !panel ||
+        !tbody ||
+        !title ||
+        !description ||
+        !count ||
+        !selectedRoomMembersKey
+    ) {
+        return;
+    }
+
+    const room = ownedRooms.find(
+        item => item.key === selectedRoomMembersKey
+    );
+
+    if (!room) {
+        closeRoomMembersPanel();
+        return;
+    }
+
+    const roomStudents = [
+        ...(adminRoomStudentGroups.get(selectedRoomMembersKey) || [])
+    ].sort((a, b) =>
+        String(a.fullName || a.nickname).localeCompare(
+            String(b.fullName || b.nickname)
+        )
+    );
+
+    title.textContent = `Students in ${room.key}`;
+    description.textContent = [
+        room.gradeLevel,
+        room.section,
+        room.teacherName
+    ].filter(Boolean).join(" · ") ||
+        "Students who joined this Learning-Based room.";
+    count.textContent = `${roomStudents.length} ${
+        roomStudents.length === 1 ? "student" : "students"
+    }`;
+
+    if (!roomStudents.length) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="question-empty-state">
+                    No students have joined this room yet.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = roomStudents.map(student => `
+        <tr>
+            <td><strong>${escapeHTML(
+                student.fullName || student.nickname || "Unknown Student"
+            )}</strong></td>
+            <td>${escapeHTML(student.studentNumber || "-")}</td>
+            <td>${escapeHTML(student.nickname || "-")}</td>
+            <td>${escapeHTML(student.yearSection || "-")}</td>
+            <td>
+                <span class="status-badge ${
+                    student.status === "completed"
+                        ? "status-completed"
+                        : "status-progress"
+                }">
+                    ${student.status === "completed"
+                        ? "Completed"
+                        : "In Progress"}
+                </span>
+            </td>
+        </tr>
+    `).join("");
+}
+
+
+function openRoomMembersPanel(roomKey) {
+    if (!ownedRoomKeys.includes(roomKey)) {
+        return;
+    }
+
+    selectedRoomMembersKey = roomKey;
+    renderRoomMembersPanel();
+
+    const panel = document.getElementById("roomMembersPanel");
+    panel.classList.remove("hidden");
+    panel.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+    });
+}
+
+
+function closeRoomMembersPanel() {
+    selectedRoomMembersKey = "";
+    document
+        .getElementById("roomMembersPanel")
+        ?.classList.add("hidden");
 }
 
 
@@ -3887,7 +4005,11 @@ document
             const roomKey = button.dataset.roomKey;
 
 
-            if (button.dataset.roomAction === "use") {
+            if (button.dataset.roomAction === "members") {
+                openRoomMembersPanel(roomKey);
+            }
+
+            else if (button.dataset.roomAction === "use") {
                 useOwnedRoom(roomKey);
             }
 
@@ -3899,6 +4021,14 @@ document
                 deleteRoom(roomKey);
             }
         }
+    );
+
+
+document
+    .getElementById("closeRoomMembers")
+    .addEventListener(
+        "click",
+        closeRoomMembersPanel
     );
 
 
