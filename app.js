@@ -4717,14 +4717,6 @@ function showStudentDetails(uid) {
 
     document
         .getElementById(
-            "detailEmail"
-        )
-        .textContent =
-            student.email;
-
-
-    document
-        .getElementById(
             "detailStudentNumber"
         )
         .textContent =
@@ -5419,7 +5411,7 @@ function renderAdminLeaderboard() {
                 <th>Room</th>
                 <th>Status</th>
                 <th>Correct</th>
-                <th>Wrong</th>
+                <th>Incorrect</th>
                 <th>Answered</th>
             </tr>
         `;
@@ -5438,10 +5430,10 @@ function renderAdminLeaderboard() {
             <th>Rank</th>
             <th>Nickname</th>
             <th>Stage</th>
-            <th>Level</th>
+            <th>Player Level</th>
             <th>EXP</th>
             <th>Correct</th>
-            <th>Wrong</th>
+            <th>Incorrect</th>
             <th>Answered</th>
         </tr>
     `;
@@ -5549,7 +5541,7 @@ function renderStudentLeaderboard() {
                 <tr>
                     <th>Rank</th>
                     <th>Player</th>
-                    <th>Level</th>
+                    <th>Player Level</th>
                     <th>EXP</th>
                     <th>Stage</th>
                 </tr>
